@@ -97,16 +97,18 @@ suggest_next_versions() {
     echo -e "${YELLOW}💡 Branche courante: ${BLUE}$current_branch${NC}"
     
     if [ -z "$latest_tag" ]; then
-        echo -e "${YELLOW}💡 Aucun tag sémantique trouvé. Suggestions pour commencer:${NC}"
+        echo -e "${YELLOW}💡 Aucun tag sémantique trouvé${NC}"
+        echo -e "${YELLOW}💡 Version à créer:${NC}"
         if [ "$interactive_mode" = true ]; then
-            echo "   1) v1.0.0 (première version)"
-            echo "   2) v0.1.0 (version de développement)"
-            echo "   3) Saisir manuellement"
+            echo -e "   ${GREEN}1)${NC} ${CYAN}v1.0.0${NC} - Première version"
+            echo -e "   ${GREEN}2)${NC} ${CYAN}v0.1.0${NC} - Version de développement"
+            echo -e "   ${GREEN}3)${NC} Saisir manuellement"
+            echo -e "   ${GREEN}4)${NC} Annuler"
         else
             echo "   - v1.0.0 (première version)"
             echo "   - v0.1.0 (version de développement)"
         fi
-        return
+        return 0
     fi
     
     # Extraire les numéros de version
@@ -171,10 +173,18 @@ interactive_tag_creation() {
     local initial_branch=$(get_current_branch)
     local initial_is_main=$(is_main_branch && echo "true" || echo "false")
     
-    if is_main_branch; then
-        read -p "Choisissez une option (1-5): " choice
+    if [ -z "$latest_tag" ]; then
+        read -p "Choisissez une option (1-4): " choice
+        if [ "$choice" = "4" ]; then
+            echo -e "${YELLOW}🚫 Création de tag annulée.${NC}"
+            return 1
+        fi
     else
-        read -p "Choisissez une option (1-2): " choice
+        if is_main_branch; then
+            read -p "Choisissez une option (1-5): " choice
+        else
+            read -p "Choisissez une option (1-2): " choice
+        fi
     fi
     
     # Vérification de sécurité : s'assurer que la branche n'a pas changé pendant la saisie
@@ -227,7 +237,7 @@ interactive_tag_creation() {
                     fi
                     ;;
                 5)
-                    echo -e "${YELLOW}⏹️  Opération annulée${NC}"
+                    echo -e "${YELLOW}🚫 Création de tag annulée.${NC}"
                     exit 0
                     ;;
                 *)
@@ -247,7 +257,7 @@ interactive_tag_creation() {
                     echo -e "${YELLOW}✅ Sélectionné: $selected_tag${NC}"
                     ;;
                 2)
-                    echo -e "${YELLOW}⏹️  Opération annulée${NC}"
+                    echo -e "${YELLOW}🚫 Création de tag annulée.${NC}"
                     exit 0
                     ;;
                 *)
