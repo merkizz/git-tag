@@ -73,9 +73,9 @@ Le script utilise les commandes Git pour :
   - `X` : Version majeure (changements non rétrocompatibles)
   - `Y` : Version mineure (nouvelles fonctionnalités)
   - `Z` : Correctifs (corrections de bugs)
-  - Alternativement, il est possible de saisir une version faisant référence à un ticket (ex: FRONT-123, FRONT-123.1) (non recommandé)
+  - Alternativement, il est possible de saisir une version faisant référence à un ticket (ex: FEATURE-123, FEATURE-123.1) (non recommandé)
 
-- **Tags temporaires** : `vX.Y.Z_BRANCHE.N` (ex: v1.0.0_feature-123.1)
+- **Tags temporaires** : `vX.Y.Z_BRANCHE.N` (ex: v1.0.0_FEATURE-123.1)
   - Ces tags sont générés uniquement pour les branches de fonctionnalité et ont une syntaxe incrémentale fixe
   - Le dernier tag de version à partir duquel la branche a divergé est utilisé pour générer le tag temporaire 
   - Après merge ou rebase de la branche principale, le dernier tag de version est repris comme base pour le tag temporaire suivant
