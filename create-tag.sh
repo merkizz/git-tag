@@ -456,7 +456,7 @@ create_and_push_tag() {
     fi
     
     # Créer le tag
-    git tag "$tag" "$commit"
+    git tag "$tag" "$commit" -m "Build tag $tag"
     echo -e "${GREEN}   ✅ Tag '$tag' créé localement${NC}"
     
     # Pousser le tag
