@@ -6,19 +6,19 @@
 set -e
 
 # Couleurs pour l'affichage
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[1;36m'  # Couleur cyan vive pour les versions
-NC='\033[0m' # No Color
+readonly COLOR_RED='\033[0;31m'
+readonly COLOR_GREEN='\033[0;32m'
+readonly COLOR_YELLOW='\033[1;33m'
+readonly COLOR_BLUE='\033[0;34m'
+readonly COLOR_CYAN='\033[1;36m'
+readonly COLOR_NONE='\033[0m'
 
-echo -e "${CYAN}🏷️  Script intelligent de création de tags${NC}"
-echo -e "${CYAN}==========================================${NC}"
+echo -e "${COLOR_CYAN}🏷️  Script intelligent de création de tags${COLOR_NONE}"
+echo -e "${COLOR_CYAN}==========================================${COLOR_NONE}"
 
 # Vérification que nous sommes dans un dépôt Git
 if ! git rev-parse --git-dir > /dev/null 2>&1; then
-    echo -e "${RED}❌ Erreur: Ce script doit être exécuté dans un dépôt Git${NC}"
+    echo -e "${COLOR_RED}❌ Erreur: Ce script doit être exécuté dans un dépôt Git${COLOR_NONE}"
     exit 1
 fi
 
@@ -37,12 +37,12 @@ get_next_temp_suffix() {
     local base_tag="$1"
     local branch="$2"
     local suffix=1
-    
+
     # Chercher les tags existants avec ce pattern
     while git tag -l | grep -q "^${base_tag}_${branch}\.${suffix}$"; do
         ((suffix++))
     done
-    
+
     echo "$suffix"
 }
 
@@ -50,7 +50,7 @@ get_next_temp_suffix() {
 get_branch_base_tag() {
     local current_branch=$(get_current_branch)
     local main_branch="master"
-    
+
     # Vérifier si master existe, sinon utiliser main
     if ! git show-ref --verify --quiet refs/heads/master; then
         if git show-ref --verify --quiet refs/heads/main; then
@@ -61,19 +61,19 @@ get_branch_base_tag() {
             return
         fi
     fi
-    
+
     # Trouver le commit de base (merge-base) entre la branche courante et master/main
     local base_commit=$(git merge-base "$current_branch" "$main_branch" 2>/dev/null || echo "")
-    
+
     if [ -z "$base_commit" ]; then
         # Si pas de merge-base trouvé, utiliser le dernier tag sémantique
         get_latest_semantic_tag
         return
     fi
-    
+
     # Trouver le tag sémantique le plus récent qui contient ce commit de base
     local base_tag=$(git tag -l --merged "$base_commit" | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" | sort -V | tail -1)
-    
+
     if [ -z "$base_tag" ]; then
         # Si aucun tag trouvé au point de base, utiliser le dernier tag sémantique
         get_latest_semantic_tag
@@ -94,16 +94,16 @@ suggest_next_versions() {
     local interactive_mode=${1:-false}
     local current_branch=$(get_current_branch)
     
-    echo -e "${YELLOW}💡 Branche courante: ${BLUE}$current_branch${NC}"
+    echo -e "${COLOR_YELLOW}💡 Branche courante: ${COLOR_BLUE}$current_branch${COLOR_NONE}"
     
     if [ -z "$latest_tag" ]; then
-        echo -e "${YELLOW}💡 Aucun tag sémantique trouvé${NC}"
-        echo -e "${YELLOW}💡 Version à créer:${NC}"
+        echo -e "${COLOR_YELLOW}💡 Aucun tag sémantique trouvé${COLOR_NONE}"
+        echo -e "${COLOR_YELLOW}💡 Version à créer:${COLOR_NONE}"
         if [ "$interactive_mode" = true ]; then
-            echo -e "   ${GREEN}1)${NC} ${CYAN}v1.0.0${NC} - Première version"
-            echo -e "   ${GREEN}2)${NC} ${CYAN}v0.1.0${NC} - Version de développement"
-            echo -e "   ${GREEN}3)${NC} Saisir manuellement"
-            echo -e "   ${GREEN}4)${NC} Annuler"
+            echo -e "   ${COLOR_GREEN}1)${COLOR_NONE} ${COLOR_CYAN}v1.0.0${COLOR_NONE} - Première version"
+            echo -e "   ${COLOR_GREEN}2)${COLOR_NONE} ${COLOR_CYAN}v0.1.0${COLOR_NONE} - Version de développement"
+            echo -e "   ${COLOR_GREEN}3)${COLOR_NONE} Saisir manuellement"
+            echo -e "   ${COLOR_GREEN}4)${COLOR_NONE} Annuler"
         else
             echo "   - v1.0.0 (première version)"
             echo "   - v0.1.0 (version de développement)"
@@ -117,8 +117,8 @@ suggest_next_versions() {
     local minor=$(echo $version_numbers | awk '{print $2}')
     local patch=$(echo $version_numbers | awk '{print $3}')
     
-    echo -e "${YELLOW}💡 Dernier tag: ${BLUE}$latest_tag${NC}"
-    echo -e "${YELLOW}💡 Version à créer:${NC}"
+    echo -e "${COLOR_YELLOW}💡 Dernier tag: ${COLOR_BLUE}$latest_tag${COLOR_NONE}"
+    echo -e "${COLOR_YELLOW}💡 Version à créer:${COLOR_NONE}"
     
     if [ "$interactive_mode" = true ]; then
         if is_main_branch; then
@@ -127,35 +127,35 @@ suggest_next_versions() {
             local next_minor="v$major.$((minor + 1)).0"
             local next_major="v$((major + 1)).0.0"
             
-            echo -e "   ${GREEN}1)${NC} ${CYAN}$next_patch${NC} - Correctif (patch) - Corrections de bugs"
-            echo -e "   ${GREEN}2)${NC} ${CYAN}$next_minor${NC} - Fonctionnalité (minor) - Nouvelles fonctionnalités"
-            echo -e "   ${GREEN}3)${NC} ${CYAN}$next_major${NC} - Majeure (major) - Changements non rétrocompatibles"
-            echo -e "   ${GREEN}4)${NC} Saisir manuellement"
-            echo -e "   ${GREEN}5)${NC} Annuler"
+            echo -e "   ${COLOR_GREEN}1)${COLOR_NONE} ${COLOR_CYAN}$next_patch${COLOR_NONE} - Correctif (patch) - Corrections de bugs"
+            echo -e "   ${COLOR_GREEN}2)${COLOR_NONE} ${COLOR_CYAN}$next_minor${COLOR_NONE} - Fonctionnalité (minor) - Nouvelles fonctionnalités"
+            echo -e "   ${COLOR_GREEN}3)${COLOR_NONE} ${COLOR_CYAN}$next_major${COLOR_NONE} - Majeure (major) - Changements non rétrocompatibles"
+            echo -e "   ${COLOR_GREEN}4)${COLOR_NONE} Saisir manuellement"
+            echo -e "   ${COLOR_GREEN}5)${COLOR_NONE} Annuler"
         else
             # Branche secondaire : uniquement des tags temporaires basés sur le tag de base de branche
             local base_tag=$(get_branch_base_tag)
             local next_suffix=$(get_next_temp_suffix "$base_tag" "$current_branch")
             local temp_tag="${base_tag}_${current_branch}.${next_suffix}"
             
-            echo -e "   ${GREEN}1)${NC} ${CYAN}$temp_tag${NC} - Tag temporaire (basé sur $base_tag)"
-            echo -e "   ${GREEN}2)${NC} Annuler"
+            echo -e "   ${COLOR_GREEN}1)${COLOR_NONE} ${COLOR_CYAN}$temp_tag${COLOR_NONE} - Tag temporaire (basé sur $base_tag)"
+            echo -e "   ${COLOR_GREEN}2)${COLOR_NONE} Annuler"
             echo ""
-            echo -e "   ${CYAN}ℹ️  Sur une branche secondaire, seuls les tags temporaires sont autorisés${NC}"
-            echo -e "   ${CYAN}💡 Les tags finaux doivent être créés sur la branche principale après merge${NC}"
+            echo -e "   ${COLOR_CYAN}ℹ️  Sur une branche secondaire, seuls les tags temporaires sont autorisés${COLOR_NONE}"
+            echo -e "   ${COLOR_CYAN}💡 Les tags finaux doivent être créés sur la branche principale après merge${COLOR_NONE}"
         fi
     else
         local next_patch="v$major.$minor.$((patch + 1))"
         local next_minor="v$major.$((minor + 1)).0"
         local next_major="v$((major + 1)).0.0"
         
-        echo -e "   ${CYAN}$next_patch${NC} - Correctif (patch) - Corrections de bugs"
-        echo -e "   ${CYAN}$next_minor${NC} - Fonctionnalité (minor) - Nouvelles fonctionnalités"
-        echo -e "   ${CYAN}$next_major${NC} - Majeure (major) - Changements incompatibles"
+        echo -e "   ${COLOR_CYAN}$next_patch${COLOR_NONE} - Correctif (patch) - Corrections de bugs"
+        echo -e "   ${COLOR_CYAN}$next_minor${COLOR_NONE} - Fonctionnalité (minor) - Nouvelles fonctionnalités"
+        echo -e "   ${COLOR_CYAN}$next_major${COLOR_NONE} - Majeure (major) - Changements incompatibles"
         
         if ! is_main_branch; then
             local temp_patch="${next_patch}_${current_branch}.1"
-            echo -e "   ${YELLOW}$temp_patch${NC} - Tag temporaire (sera nettoyé automatiquement)"
+            echo -e "   ${COLOR_YELLOW}$temp_patch${COLOR_NONE} - Tag temporaire (sera nettoyé automatiquement)"
         fi
     fi
 }
@@ -163,20 +163,22 @@ suggest_next_versions() {
 # Fonction pour le mode interactif
 interactive_tag_creation() {
     echo ""
+
     suggest_next_versions true
-    
+
     local current_branch=$(get_current_branch)
     local latest_tag=$(get_latest_semantic_tag)
     local selected_tag=""
-    
+
     echo ""
+
     local initial_branch=$(get_current_branch)
     local initial_is_main=$(is_main_branch && echo "true" || echo "false")
-    
+
     if [ -z "$latest_tag" ]; then
         read -p "Choisissez une option (1-4): " choice
         if [ "$choice" = "4" ]; then
-            echo -e "${YELLOW}🚫 Création de tag annulée.${NC}"
+            echo -e "${COLOR_YELLOW}🚫 Création de tag annulée.${COLOR_NONE}"
             return 1
         fi
     else
@@ -186,62 +188,61 @@ interactive_tag_creation() {
             read -p "Choisissez une option (1-2): " choice
         fi
     fi
-    
+
     # Vérification de sécurité : s'assurer que la branche n'a pas changé pendant la saisie
     local current_branch_after=$(get_current_branch)
     local current_is_main_after=$(is_main_branch && echo "true" || echo "false")
-    
+
     if [ "$initial_branch" != "$current_branch_after" ] || [ "$initial_is_main" != "$current_is_main_after" ]; then
-        echo -e "${RED}❌ ERREUR : La branche a changé pendant l'exécution du script !${NC}"
-        echo -e "${RED}   Branche initiale: $initial_branch (main: $initial_is_main)${NC}"
-        echo -e "${RED}   Branche actuelle: $current_branch_after (main: $current_is_main_after)${NC}"
-        echo -e "${YELLOW}⚠️  Pour éviter les incohérences, veuillez relancer le script sur la branche souhaitée.${NC}"
+        echo -e "${COLOR_RED}❌ ERREUR : La branche a changé pendant l'exécution du script !${COLOR_NONE}"
+        echo -e "${COLOR_RED}   Branche initiale: $initial_branch (main: $initial_is_main)${COLOR_NONE}"
+        echo -e "${COLOR_RED}   Branche actuelle: $current_branch_after (main: $current_is_main_after)${COLOR_NONE}"
+        echo -e "${COLOR_YELLOW}⚠️  Pour éviter les incohérences, veuillez relancer le script sur la branche souhaitée.${COLOR_NONE}"
         exit 1
     fi
-    
+
     if [ ! -z "$latest_tag" ]; then
         # Extraire les numéros de version
         local version_numbers=$(echo "$latest_tag" | sed 's/^v//' | tr '.' ' ')
         local major=$(echo $version_numbers | awk '{print $1}')
         local minor=$(echo $version_numbers | awk '{print $2}')
         local patch=$(echo $version_numbers | awk '{print $3}')
-        
+
         # Calculer les suggestions
         local next_patch="v$major.$minor.$((patch + 1))"
         local next_minor="v$major.$((minor + 1)).0"
         local next_major="v$((major + 1)).0.0"
         local temp_patch="${next_patch}_${current_branch}.1"
-        local temp_minor="${next_minor}_${current_branch}.1"
-        
+
         if is_main_branch; then
             # Logique pour branche principale
             case $choice in
                 1)
                     selected_tag="$next_patch"
-                    echo -e "${GREEN}✅ Sélectionné: $selected_tag (correctif)${NC}"
+                    echo -e "${COLOR_GREEN}✅ Sélectionné: $selected_tag (correctif)${COLOR_NONE}"
                     ;;
                 2)
                     selected_tag="$next_minor"
-                    echo -e "${GREEN}✅ Sélectionné: $selected_tag (fonctionnalité)${NC}"
+                    echo -e "${COLOR_GREEN}✅ Sélectionné: $selected_tag (fonctionnalité)${COLOR_NONE}"
                     ;;
                 3)
                     selected_tag="$next_major"
-                    echo -e "${GREEN}✅ Sélectionné: $selected_tag (majeure)${NC}"
+                    echo -e "${COLOR_GREEN}✅ Sélectionné: $selected_tag (majeure)${COLOR_NONE}"
                     ;;
                 4)
                     echo ""
                     read -p "Saisissez le tag manuellement: " selected_tag
                     if [ -z "$selected_tag" ]; then
-                        echo -e "${RED}❌ Tag vide, opération annulée${NC}"
+                        echo -e "${COLOR_RED}❌ Tag vide, opération annulée${COLOR_NONE}"
                         exit 1
                     fi
                     ;;
                 5)
-                    echo -e "${YELLOW}🚫 Création de tag annulée.${NC}"
+                    echo -e "${COLOR_YELLOW}🚫 Création de tag annulée.${COLOR_NONE}"
                     exit 0
                     ;;
                 *)
-                    echo -e "${RED}❌ Choix invalide, opération annulée${NC}"
+                    echo -e "${COLOR_RED}❌ Choix invalide, opération annulée${COLOR_NONE}"
                     exit 1
                     ;;
             esac
@@ -250,18 +251,18 @@ interactive_tag_creation() {
             local base_tag=$(get_branch_base_tag)
             local next_suffix=$(get_next_temp_suffix "$base_tag" "$current_branch")
             local temp_tag="${base_tag}_${current_branch}.${next_suffix}"
-            
+
             case $choice in
                 1)
                     selected_tag="$temp_tag"
-                    echo -e "${YELLOW}✅ Sélectionné: $selected_tag${NC}"
+                    echo -e "${COLOR_YELLOW}✅ Sélectionné: $selected_tag${COLOR_NONE}"
                     ;;
                 2)
-                    echo -e "${YELLOW}🚫 Création de tag annulée.${NC}"
+                    echo -e "${COLOR_YELLOW}🚫 Création de tag annulée.${COLOR_NONE}"
                     exit 0
                     ;;
                 *)
-                    echo -e "${RED}❌ Choix invalide, opération annulée${NC}"
+                    echo -e "${COLOR_RED}❌ Choix invalide, opération annulée${COLOR_NONE}"
                     exit 1
                     ;;
             esac
@@ -271,30 +272,30 @@ interactive_tag_creation() {
         case $choice in
             1)
                 selected_tag="v1.0.0"
-                echo -e "${GREEN}✅ Sélectionné: $selected_tag (première version)${NC}"
+                echo -e "${COLOR_GREEN}✅ Sélectionné: $selected_tag (première version)${COLOR_NONE}"
                 ;;
             2)
                 selected_tag="v0.1.0"
-                echo -e "${GREEN}✅ Sélectionné: $selected_tag (version de développement)${NC}"
+                echo -e "${COLOR_GREEN}✅ Sélectionné: $selected_tag (version de développement)${COLOR_NONE}"
                 ;;
             3)
                 echo ""
                 read -p "Saisissez le tag manuellement: " selected_tag
                 if [ -z "$selected_tag" ]; then
-                    echo -e "${RED}❌ Tag vide, opération annulée${NC}"
+                    echo -e "${COLOR_RED}❌ Tag vide, opération annulée${COLOR_NONE}"
                     exit 1
                 fi
                 ;;
             *)
-                echo -e "${RED}❌ Choix invalide, opération annulée${NC}"
+                echo -e "${COLOR_RED}❌ Choix invalide, opération annulée${COLOR_NONE}"
                 exit 1
                 ;;
         esac
     fi
-    
+
     # Appliquer le tag sélectionné
     if is_main_branch; then
-        echo -e "\n${BLUE}🚀 Application du tag sélectionné: $selected_tag${NC}"
+        echo -e "\n${COLOR_BLUE}🚀 Application du tag sélectionné: $selected_tag${COLOR_NONE}"
     fi
     TAG_NAME="$selected_tag"
 }
@@ -303,9 +304,9 @@ interactive_tag_creation() {
 FILTERED_ARGS=()
 for arg in "$@"; do
     if [[ "$arg" =~ ^-- ]]; then
-        echo -e "${RED}❌ Option inconnue: $arg${NC}"
-        echo -e "${BLUE}Ce script n'accepte aucune option.${NC}"
-        echo -e "${BLUE}Usage:${NC}"
+        echo -e "${COLOR_RED}❌ Option inconnue: $arg${COLOR_NONE}"
+        echo -e "${COLOR_BLUE}Ce script n'accepte aucune option.${COLOR_NONE}"
+        echo -e "${COLOR_BLUE}Usage:${COLOR_NONE}"
         echo "  $0                # Mode interactif"
         echo "  $0 <tag-name>     # Création directe"
         echo "  $0 <tag-name> <commit-hash>"
@@ -329,9 +330,9 @@ if [ -z "$TAG_NAME" ]; then
     if [ ! -z "$TAG_NAME" ] && ! is_main_branch; then
         # Vérifier si c'est un tag sémantique (final)
         if [[ "$TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ "$TAG_NAME" =~ ^(BACK|FRONT|CMP|CNS|PRTL)-[0-9]+\.[0-9]+$ ]]; then
-            echo -e "${RED}❌ Impossible de créer un tag final sur une branche secondaire${NC}"
-            echo -e "${BLUE}💡 Les tags finaux doivent être créés sur la branche principale (master/main)${NC}"
-            echo -e "${YELLOW}💡 Utilisez le mode interactif pour créer des tags temporaires: ./create-tag.sh${NC}"
+            echo -e "${COLOR_RED}❌ Impossible de créer un tag final sur une branche secondaire${COLOR_NONE}"
+            echo -e "${COLOR_BLUE}💡 Les tags finaux doivent être créés sur la branche principale (master/main)${COLOR_NONE}"
+            echo -e "${COLOR_YELLOW}💡 Utilisez le mode interactif pour créer des tags temporaires: ./create-tag.sh${COLOR_NONE}"
             exit 1
         fi
     fi
@@ -345,28 +346,28 @@ validate_tag_format() {
     
     # Patterns acceptés pour les tags sémantiques
     if [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        echo -e "${GREEN}✅ Tag de version sémantique valide: $tag${NC}"
+        echo -e "${COLOR_GREEN}✅ Tag de version sémantique valide: $tag${COLOR_NONE}"
         return 0
     elif [[ "$tag" =~ ^(BACK|FRONT|CMP|CNS|PRTL)-[0-9]+\.[0-9]+$ ]]; then
-        echo -e "${GREEN}✅ Tag de ticket valide: $tag${NC}"
+        echo -e "${COLOR_GREEN}✅ Tag de ticket valide: $tag${COLOR_NONE}"
         return 0
     elif [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-[a-z]+$ ]]; then
-        echo -e "${YELLOW}⚠️  Tag de pré-release: $tag${NC}"
-        echo -e "${YELLOW}   Assurez-vous que c'est intentionnel.${NC}"
+        echo -e "${COLOR_YELLOW}⚠️  Tag de pré-release: $tag${COLOR_NONE}"
+        echo -e "${COLOR_YELLOW}   Assurez-vous que c'est intentionnel.${COLOR_NONE}"
         return 0
     elif [[ "$tag" =~ _.*\. ]]; then
         # Tags temporaires - autorisés uniquement sur les branches secondaires
         if ! is_main_branch; then
-            echo -e "${YELLOW}✅ Tag temporaire valide: $tag${NC}"
+            echo -e "${COLOR_YELLOW}✅ Tag temporaire valide: $tag${COLOR_NONE}"
             return 0
         else
-            echo -e "${RED}❌ Les tags temporaires ne sont pas autorisés sur les branches principales${NC}"
-            echo -e "${BLUE}💡 Utilisez un tag sémantique (v1.2.3) ou de ticket (BACK-123.1)${NC}"
+            echo -e "${COLOR_RED}❌ Les tags temporaires ne sont pas autorisés sur les branches principales${COLOR_NONE}"
+            echo -e "${COLOR_BLUE}💡 Utilisez un tag sémantique (v1.2.3) ou de ticket (BACK-123.1)${COLOR_NONE}"
             return 1
         fi
     else
-        echo -e "${RED}❌ Format de tag non valide: $tag${NC}"
-        echo -e "${BLUE}Formats acceptés:${NC}"
+        echo -e "${COLOR_RED}❌ Format de tag non valide: $tag${COLOR_NONE}"
+        echo -e "${COLOR_BLUE}Formats acceptés:${COLOR_NONE}"
         if is_main_branch; then
             echo "  - Versions sémantiques: v1.2.3"
             echo "  - Tags de tickets: BACK-123.1, FRONT-456.2"
@@ -376,7 +377,7 @@ validate_tag_format() {
             echo "  - Versions sémantiques: v1.2.3 (non recommandé)"
             echo "  - Tags de tickets: BACK-123.1 (non recommandé)"
         fi
-        echo -e "${RED}Formats interdits:${NC}"
+        echo -e "${COLOR_RED}Formats interdits:${COLOR_NONE}"
         echo "  - Tags de test: v1.2.3_testing.1"
         echo "  - Tags non sémantiques: fix_something_v1"
         return 1
@@ -386,34 +387,34 @@ validate_tag_format() {
 # Fonction pour vérifier si le tag existe déjà
 check_tag_exists() {
     local tag="$1"
-    
+
     if git tag -l | grep -q "^$tag$"; then
-        echo -e "${RED}❌ Le tag '$tag' existe déjà localement${NC}"
+        echo -e "${COLOR_RED}❌ Le tag '$tag' existe déjà localement${COLOR_NONE}"
         return 1
     fi
-    
+
     if git ls-remote --tags origin | grep -q "refs/tags/$tag$"; then
-        echo -e "${RED}❌ Le tag '$tag' existe déjà sur le remote${NC}"
+        echo -e "${COLOR_RED}❌ Le tag '$tag' existe déjà sur le remote${COLOR_NONE}"
         return 1
     fi
-    
+
     return 0
 }
 
 # Fonction de nettoyage automatique des tags temporaires
 auto_cleanup_temp_tags() {
-    echo -e "\n${BLUE}🧹 Nettoyage automatique des tags temporaires...${NC}"
-    
+    echo -e "\n${COLOR_BLUE}🧹 Nettoyage automatique des tags temporaires...${COLOR_NONE}"
+
     # Pattern amélioré pour détecter tous les types de tags temporaires
     temp_tags=$(git tag -l | grep -E "_.*\.|_[A-Z]+-[0-9]+$" || true)
     
     if [ -z "$temp_tags" ]; then
-        echo -e "${GREEN}   ✅ Aucun tag temporaire à nettoyer${NC}"
+        echo -e "${COLOR_GREEN}   ✅ Aucun tag temporaire à nettoyer${COLOR_NONE}"
         return 0
     fi
     
     temp_count=$(echo "$temp_tags" | wc -l | tr -d ' ')
-    echo -e "${YELLOW}   🔍 $temp_count tags temporaires détectés${NC}"
+    echo -e "${COLOR_YELLOW}   🔍 $temp_count tags temporaires détectés${COLOR_NONE}"
     
     # Affiche les premiers tags temporaires
     echo "$temp_tags" | head -5 | while read tag; do
@@ -424,7 +425,7 @@ auto_cleanup_temp_tags() {
         echo "     ... et $((temp_count - 5)) autres"
     fi
     
-    echo -e "${BLUE}   Suppression automatique des tags temporaires...${NC}"
+    echo -e "${COLOR_BLUE}   Suppression automatique des tags temporaires...${COLOR_NONE}"
     
     count=0
     for tag in $temp_tags; do
@@ -433,10 +434,10 @@ auto_cleanup_temp_tags() {
         count=$((count + 1))
     done
     
-    echo -e "${GREEN}   ✅ $count tags temporaires supprimés localement${NC}"
+    echo -e "${COLOR_GREEN}   ✅ $count tags temporaires supprimés localement${COLOR_NONE}"
     
     # Nettoyage des tags temporaires distants
-    echo -e "${BLUE}   Nettoyage des tags temporaires sur le remote...${NC}"
+    echo -e "${COLOR_BLUE}   Nettoyage des tags temporaires sur le remote...${COLOR_NONE}"
     remote_temp_tags=$(git ls-remote --tags origin | grep -E "_.*\.|_[A-Z]+-[0-9]+$" | awk '{print $2}' | sed 's/refs\/tags\///' || true)
     
     if [ ! -z "$remote_temp_tags" ]; then
@@ -446,9 +447,9 @@ auto_cleanup_temp_tags() {
             git push --delete origin "$tag" 2>/dev/null || echo "       ⚠️  Tag $tag déjà supprimé"
             remote_count=$((remote_count + 1))
         done
-        echo -e "${GREEN}   ✅ $remote_count tags temporaires distants supprimés${NC}"
+        echo -e "${COLOR_GREEN}   ✅ $remote_count tags temporaires distants supprimés${COLOR_NONE}"
     else
-        echo -e "${GREEN}   ✅ Aucun tag temporaire distant à supprimer${NC}"
+        echo -e "${COLOR_GREEN}   ✅ Aucun tag temporaire distant à supprimer${COLOR_NONE}"
     fi
 }
 
@@ -457,28 +458,28 @@ create_and_push_tag() {
     local tag="$1"
     local commit="$2"
     
-    echo -e "\n${BLUE}🏷️  Création du tag '$tag'...${NC}"
+    echo -e "\n${COLOR_BLUE}🏷️  Création du tag '$tag'...${COLOR_NONE}"
     
     # Vérifier que le commit existe
     if ! git rev-parse --verify "$commit" >/dev/null 2>&1; then
-        echo -e "${RED}❌ Le commit '$commit' n'existe pas${NC}"
+        echo -e "${COLOR_RED}❌ Le commit '$commit' n'existe pas${COLOR_NONE}"
         return 1
     fi
-    
+
     # Créer le tag
     git tag "$tag" "$commit" -m "Build tag $tag"
-    echo -e "${GREEN}   ✅ Tag '$tag' créé localement${NC}"
+    echo -e "${COLOR_GREEN}   ✅ Tag '$tag' créé localement${COLOR_NONE}"
     
     # Pousser le tag
-    echo -e "${BLUE}   📤 Push du tag vers le remote...${NC}"
+    echo -e "${COLOR_BLUE}   📤 Push du tag vers le remote...${COLOR_NONE}"
     git push origin "$tag"
-    echo -e "${GREEN}   ✅ Tag '$tag' poussé sur le remote${NC}"
+    echo -e "${COLOR_GREEN}   ✅ Tag '$tag' poussé sur le remote${COLOR_NONE}"
 }
 
 # Fonction pour afficher les statistiques finales
 show_final_stats() {
     if is_main_branch; then
-        echo -e "\n${BLUE}📊 Statistiques finales:${NC}"
+        echo -e "\n${COLOR_BLUE}📊 Statistiques finales:${COLOR_NONE}"
         total_tags=$(git tag -l | wc -l | tr -d ' ')
         temp_tags=$(git tag -l | grep -E "_.*\.|_[A-Z]+-[0-9]+$" | wc -l | tr -d ' ')
         clean_tags=$((total_tags - temp_tags))
@@ -488,14 +489,14 @@ show_final_stats() {
         echo "   Tags propres: $clean_tags"
         
         if [ $temp_tags -eq 0 ]; then
-            echo -e "${GREEN}   🎉 Dépôt parfaitement nettoyé !${NC}"
+            echo -e "${COLOR_GREEN}   🎉 Dépôt parfaitement nettoyé !${COLOR_NONE}"
         fi
     fi
 }
 
 # MAIN EXECUTION
 if is_main_branch; then
-    echo -e "${BLUE}🔍 Validation du tag '$TAG_NAME'...${NC}"
+    echo -e "${COLOR_BLUE}🔍 Validation du tag '$TAG_NAME'...${COLOR_NONE}"
     
     # 1. Valider le format du tag (uniquement sur branches principales)
     if ! validate_tag_format "$TAG_NAME"; then
@@ -521,17 +522,17 @@ fi
 # 5. Afficher les statistiques finales
 show_final_stats
 
-echo -e "\n${GREEN}🎉 Tag '$TAG_NAME' créé avec succès !${NC}"
+echo -e "\n${COLOR_GREEN}🎉 Tag '$TAG_NAME' créé avec succès !${COLOR_NONE}"
 
 if is_main_branch; then
-    echo -e "${BLUE}Le dépôt a été automatiquement nettoyé des tags temporaires.${NC}"
+    echo -e "${COLOR_BLUE}Le dépôt a été automatiquement nettoyé des tags temporaires.${COLOR_NONE}"
     
     # Message de bonnes pratiques pour les branches principales
-    echo -e "\n${YELLOW}💡 Bonnes pratiques:${NC}"
+    echo -e "\n${COLOR_YELLOW}💡 Bonnes pratiques:${COLOR_NONE}"
     echo "   - Utilisez ce script pour créer tous vos tags"
     echo "   - Évitez 'git tag' et 'git push --tags' directement"
     echo "   - Le nettoyage automatique maintient un dépôt propre"
 else
     # Message simplifié pour les branches secondaires
-    echo -e "\n${YELLOW}💡 Tag temporaire créé pour le développement sur cette branche.${NC}"
+    echo -e "\n${COLOR_YELLOW}💡 Tag temporaire créé pour le développement sur cette branche.${COLOR_NONE}"
 fi
