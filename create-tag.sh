@@ -13,6 +13,11 @@ readonly COLOR_RED='\033[0;31m'
 readonly COLOR_YELLOW='\033[1;33m'
 readonly COLOR_NONE='\033[0m'
 
+# Valeurs par défaut
+readonly DEFAULT_COMMIT="HEAD"
+readonly DEFAULT_MAJOR_VERSION="v1.0.0"
+readonly DEFAULT_MINOR_VERSION="v0.1.0"
+
 # Fonctions d'affichage pour factoriser les messages
 print_blue() {
   echo -e "${COLOR_BLUE}$1${COLOR_NONE}"
@@ -301,11 +306,11 @@ interactive_tag_creation() {
         # Cas où il n'y a pas de tag sémantique existant
         case $choice in
             1)
-                selected_tag="v1.0.0"
+                selected_tag="$DEFAULT_MAJOR_VERSION"
                 print_success "Sélectionné: $selected_tag (première version)"
                 ;;
             2)
-                selected_tag="v0.1.0"
+                selected_tag="$DEFAULT_MINOR_VERSION"
                 print_success "Sélectionné: $selected_tag (version de développement)"
                 ;;
             3)
@@ -369,7 +374,7 @@ if [ -z "$TAG_NAME" ]; then
     fi
 fi
 
-COMMIT_HASH="${FILTERED_ARGS[1]:-HEAD}"
+COMMIT_HASH="${FILTERED_ARGS[1]:-$DEFAULT_COMMIT}"
 
 # Fonction pour valider le format du tag
 validate_tag_format() {
