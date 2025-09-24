@@ -388,6 +388,39 @@ check_tag_exists() {
     return 0
 }
 
+# Fonction pour créer et pousser le tag
+create_and_push_tag() {
+    local tag="$1"
+    local commit="$2"
+
+    echo ""
+    print_info "🏷️  Création du tag '$tag'..."
+
+    # Vérifier que le commit existe
+    if ! git rev-parse --verify "$commit" >/dev/null 2>&1; then
+        print_error "Le commit '$commit' n'existe pas"
+        return 1
+    fi
+
+    # Créer le tag
+    git tag "$tag" "$commit" -m "Build tag $tag"
+    print_success "Tag '$tag' créé localement"
+
+    # Pousser le tag vers le dépôt distant
+    if git remote | grep -q origin; then
+        echo ""
+        print_info "📤 Envoi du tag vers le dépôt distant..."
+
+        if git push origin "$tag" >/dev/null 2>&1; then
+            print_success "Tag '$tag' poussé avec succès"
+        else
+            print_warning "Impossible de pousser le tag '$tag'"
+        fi
+    else
+        print_info "Aucun remote 'origin' configuré, le tag n'a pas été poussé"
+    fi
+}
+
 # Fonction de nettoyage automatique des tags temporaires
 cleanup_temporary_tags() {
     echo ""
@@ -439,30 +472,6 @@ cleanup_temporary_tags() {
 	done
 
 	print_success "$remote_deleted_count tags temporaires sur le dépôt distant"
-}
-
-# Fonction pour créer et pousser le tag
-create_and_push_tag() {
-    local tag="$1"
-    local commit="$2"
-
-    echo ""
-    print_info "🏷️  Création du tag '$tag'..."
-
-    # Vérifier que le commit existe
-    if ! git rev-parse --verify "$commit" >/dev/null 2>&1; then
-        print_error "Le commit '$commit' n'existe pas"
-        return 1
-    fi
-
-    # Créer le tag
-    git tag "$tag" "$commit" -m "Build tag $tag"
-    print_success "Tag '$tag' créé localement"
-
-    # Pousser le tag
-    print_info "📤 Push du tag vers le remote..."
-    git push origin "$tag"
-    print_success "Tag '$tag' poussé sur le remote"
 }
 
 # Fonction pour afficher l'inventaire des tags
