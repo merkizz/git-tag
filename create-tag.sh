@@ -8,9 +8,9 @@ set -e
 readonly COLOR_BLUE='\033[0;34m'
 readonly COLOR_CYAN='\033[1;36m'
 readonly COLOR_GREEN='\033[0;32m'
-readonly COLOR_ORANGE='\033[0;33m'
+readonly COLOR_ORANGE='\033[1;33m'
 readonly COLOR_RED='\033[0;31m'
-readonly COLOR_YELLOW='\033[1;33m'
+readonly COLOR_YELLOW='\033[0;33m'
 readonly COLOR_NONE='\033[0m'
 
 readonly DEFAULT_COMMIT="HEAD"
@@ -121,201 +121,161 @@ get_current_branch_base_tag() {
     fi
 
     # Find the latest semantic tag that contains this base commit
-    local base_tag=$(git tag -l --merged "$base_commit" | grep -E "$SEMANTIC_VERSION_TAG_PATTERN" | sort -V | tail -1)
+    local latest_base_tag=$(git tag -l --merged "$base_commit" | grep -E "$SEMANTIC_VERSION_TAG_PATTERN" | sort -V | tail -1)
 
-    if [ -z "$base_tag" ]; then
+    if [ -z "$latest_base_tag" ]; then
         # If no tag is found at the base point, use the latest semantic tag
         get_latest_semantic_tag
     else
-        echo "$base_tag"
+        echo "$latest_base_tag"
     fi
 }
 
 get_tmp_tag_next_suffix() {
-    local base_tag="$1"
+    local latest_base_tag="$1"
     local branch="$2"
     local suffix=1
 
-    while git tag -l | grep -q "^${base_tag}_${branch}\.${suffix}$"; do
+    while git tag -l | grep -q "^${latest_base_tag}_${branch}\.${suffix}$"; do
         ((suffix++))
     done
 
     echo "$suffix"
 }
 
-display_options() {
-    local current_branch=$(get_current_branch)
-
-    print_yellow "Current branch: ${COLOR_BLUE}$current_branch${COLOR_NONE}"
-
-    if is_main_branch; then
-        local latest_tag=$(get_latest_semantic_tag)
-        if [ -z "$latest_tag" ]; then
-            print_yellow "No semantic tag found"
-            print_yellow "Version to create:"
-            print_option "1" "First version" "v1.0.0"
-            print_option "2" "Development version" "v0.1.0"
-            print_option "3" "Enter tag manually"
-            print_option "4" "Cancel"
-            return 0
-        fi
-
-        # Calculate next versions
-        local version_digits=$(echo "$latest_tag" | sed 's/^v//' | tr '.' ' ')
-        local patch=$(echo $version_digits | awk '{print $3}')
-        local minor=$(echo $version_digits | awk '{print $2}')
-        local major=$(echo $version_digits | awk '{print $1}')
-        local next_patch="v$major.$minor.$((patch + 1))"
-        local next_minor="v$major.$((minor + 1)).0"
-        local next_major="v$((major + 1)).0.0"
-
-        print_yellow "Latest tag: ${COLOR_BLUE}$latest_tag${COLOR_NONE}"
-        print_yellow "Version to create:"
-        print_option "1" "Patch - Bug fixes" "$next_patch"
-        print_option "2" "Minor - New features" "$next_minor"
-        print_option "3" "Major - Breaking changes" "$next_major"
-        print_option "4" "Enter tag manually"
-        print_option "5" "Cancel"
-    else
-        local base_tag=$(get_current_branch_base_tag)
-        local next_suffix=$(get_tmp_tag_next_suffix "$base_tag" "$current_branch")
-        local temp_tag="${base_tag}_${current_branch}.${next_suffix}"
-
-        print_yellow "Version to create:"
-        print_option "1" "Temporary tag (based on $base_tag)" "$temp_tag"
-        print_option "2" "Cancel"
-        print_tip "\nOn a feature branch, only temporary tags are allowed. Final tags should be created on the main branch after merging"
-    fi
-}
-
 run_interactive_mode() {
     echo ""
 
-    display_options
-
     local current_branch=$(get_current_branch)
+    local current_branch_is_main=$(is_main_branch && echo "true" || echo "false")
     local latest_tag=$(get_latest_semantic_tag)
     local selected_tag=""
 
-    local initial_branch=$(get_current_branch)
-    local initial_is_main=$(is_main_branch && echo "true" || echo "false")
+	print_yellow "Current branch: ${COLOR_BLUE}$current_branch${COLOR_NONE}"
 
-    if [ -z "$latest_tag" ]; then
-    	print_step "Select an option (1-4):"
-		read -r choice
-        if [ "$choice" = "4" ]; then
-            print_yellow "🚫  Tag creation cancelled."
-            return 1
-        fi
-    else
-        if is_main_branch; then
-        	print_step "Select an option (1-5):"
-			read -r choice
-        else
-            print_step "Select an option (1-2):"
-			read -r choice
-        fi
-    fi
+	if is_main_branch; then
+		if [ -z "$latest_tag" ]; then
+			print_yellow "No tag found"
+			print_step "Select an option (1-3) or C to cancel:"
+			print_option "1" "Development" "$DEFAULT_MINOR_VERSION"
+			print_option "2" "Release" "$DEFAULT_MAJOR_VERSION"
+			print_option "3" "Enter tag manually"
+			read -p ": " choice
+			case $choice in
+				1)
+					selected_tag="$DEFAULT_MINOR_VERSION"
+					print_success "Selected tag: $selected_tag (development)"
+					;;
+				2)
+					selected_tag="$DEFAULT_MAJOR_VERSION"
+					print_success "Selected tag: $selected_tag (release)"
+					;;
+				3)
+					print_blue "Enter tag:"
+					read -r custom_tag
+					if [ -z "$custom_tag" ]; then
+						print_error "Empty tag, tag creation cancelled"
+						exit 1
+					fi
+					selected_tag="$custom_tag"
+					;;
+				C)
+					print_yellow "🚫  Tag creation cancelled."
+					exit 0
+					;;
+				*)
+					print_error "Invalid option, tag creation cancelled"
+					exit 1
+					;;
+			esac
+		else
+			# Calculate next versions
+			local version_digits=$(echo "$latest_tag" | sed 's/^v//' | tr '.' ' ')
+			local patch=$(echo $version_digits | awk '{print $3}')
+			local minor=$(echo $version_digits | awk '{print $2}')
+			local major=$(echo $version_digits | awk '{print $1}')
+			local next_patch="v$major.$minor.$((patch + 1))"
+			local next_minor="v$major.$((minor + 1)).0"
+			local next_major="v$((major + 1)).0.0"
+
+			print_yellow "Latest tag: ${COLOR_CYAN}$latest_tag${COLOR_NONE}"
+			print_step "Select an option (1-4) or C to cancel:"
+			print_option "1" "Patch - Bug fixes" "$next_patch"
+			print_option "2" "Minor - New features" "$next_minor"
+			print_option "3" "Major - Breaking changes" "$next_major"
+			print_option "4" "Enter tag manually"
+			read -p ": " choice
+			case $choice in
+				1)
+					selected_tag="$next_patch"
+					print_success "Selected tag: $selected_tag (patch)"
+					;;
+				2)
+					selected_tag="$next_minor"
+					print_success "Selected tag: $selected_tag (minor)"
+					;;
+				3)
+					selected_tag="$next_major"
+					print_success "Selected tag: $selected_tag (major)"
+					;;
+				4)
+					print_blue "Enter tag:"
+					read -r custom_tag
+					if [ -z "$custom_tag" ]; then
+						print_error "Empty tag, operation cancelled"
+						exit 1
+					fi
+					selected_tag="$custom_tag"
+					print_success "Selected tag: $selected_tag"
+					;;
+				C)
+					print_yellow "🚫  Tag creation cancelled."
+					exit 0
+					;;
+				*)
+					print_error "Invalid option, tag creation cancelled"
+					exit 1
+					;;
+			esac
+		fi
+	else
+		local latest_base_tag=$(get_current_branch_base_tag)
+		local next_suffix=$(get_tmp_tag_next_suffix "$latest_base_tag" "$current_branch")
+		local next_tmp_tag="${latest_base_tag}_${current_branch}.${next_suffix}"
+
+		print_yellow "Latest tag: ${COLOR_CYAN}$latest_tag${COLOR_NONE}"
+		print_yellow "Latest base tag for this branch: ${COLOR_CYAN}$latest_base_tag${COLOR_NONE}"
+		echo ""
+		print_tip "On a feature branch, only temporary tags are allowed. Final tags should be created on the main branch after merge."
+		print_step "Enter V to create the following tag or C to cancel:"
+		echo -e "   Temporary - Feature development ${COLOR_CYAN}$next_tmp_tag${COLOR_NONE}"
+		read -p ": " choice
+		case $choice in
+			V)
+				selected_tag="$next_tmp_tag"
+				print_success "Selected tag: $selected_tag"
+				;;
+			C)
+				print_yellow "🚫  Tag creation cancelled."
+				exit 0
+				;;
+			*)
+				print_error "Invalid option, tag creation cancelled"
+				exit 1
+				;;
+		esac
+	fi
 
 	# Ensure the branch has not changed before the selection
     local current_branch_after=$(get_current_branch)
-    local current_is_main_after=$(is_main_branch && echo "true" || echo "false")
+    local current_branch_is_main_after=$(is_main_branch && echo "true" || echo "false")
 
-    if [ "$initial_branch" != "$current_branch_after" ] || [ "$initial_is_main" != "$current_is_main_after" ]; then
+    if [ "$current_branch" != "$current_branch_after" ] || [ "$current_branch_is_main" != "$current_branch_is_main_after" ]; then
         print_error "The branch changed while the script was running!"
-        print_red "Initial branch: $initial_branch (main: $initial_is_main)"
-        print_red "Current branch: $current_branch_after (main: $current_is_main_after)"
+        print_red "Initial branch: $current_branch (main: $current_branch_is_main)"
+        print_red "Current branch: $current_branch_after (main: $current_branch_is_main_after)"
         print_warning "You need to rerun the script on the current branch."
         exit 1
-    fi
-
-    if [ ! -z "$latest_tag" ]; then
-        local version_digits=$(echo "$latest_tag" | sed 's/^v//' | tr '.' ' ')
-        local major=$(echo $version_digits | awk '{print $1}')
-        local minor=$(echo $version_digits | awk '{print $2}')
-        local patch=$(echo $version_digits | awk '{print $3}')
-        local next_patch="v$major.$minor.$((patch + 1))"
-        local next_minor="v$major.$((minor + 1)).0"
-        local next_major="v$((major + 1)).0.0"
-        local temp_patch="${next_patch}_${current_branch}.1"
-
-        if is_main_branch; then
-            case $choice in
-                1)
-                    selected_tag="$next_patch"
-                    print_success "Selected tag: $selected_tag (patch)"
-                    ;;
-                2)
-                    selected_tag="$next_minor"
-                    print_success "Selected tag: $selected_tag (minor)"
-                    ;;
-                3)
-                    selected_tag="$next_major"
-                    print_success "Selected tag: $selected_tag (major)"
-                    ;;
-                4)
-                    print_blue "Enter tag:"
-                    read -r custom_tag
-                    if [ -z "$custom_tag" ]; then
-                        print_error "Empty tag, operation cancelled"
-                        exit 1
-                    fi
-                    selected_tag="$custom_tag"
-                    print_success "Selected tag: $selected_tag"
-                    ;;
-                5)
-                    print_yellow "🚫  Tag creation cancelled."
-                    exit 0
-                    ;;
-                *)
-                    print_error "Invalid option, operation cancelled"
-                    exit 1
-                    ;;
-            esac
-        else
-            local base_tag=$(get_current_branch_base_tag)
-            local next_suffix=$(get_tmp_tag_next_suffix "$base_tag" "$current_branch")
-            local temp_tag="${base_tag}_${current_branch}.${next_suffix}"
-
-            case $choice in
-                1)
-                    selected_tag="$temp_tag"
-                    print_success "Selected tag: $selected_tag"
-                    ;;
-                2)
-                    print_yellow "🚫  Tag creation cancelled."
-                    exit 0
-                    ;;
-                *)
-                    print_error "Invalid option, operation cancelled"
-                    exit 1
-                    ;;
-            esac
-        fi
-    else
-        case $choice in
-            1)
-                selected_tag="$DEFAULT_MAJOR_VERSION"
-                print_success "Selected tag: $selected_tag (major)"
-                ;;
-            2)
-                selected_tag="$DEFAULT_MINOR_VERSION"
-                print_success "Selected tag: $selected_tag (minor)"
-                ;;
-            3)
-                print_blue "Enter tag:"
-                read -r custom_tag
-                if [ -z "$custom_tag" ]; then
-                    print_error "Empty tag, operation cancelled"
-                    exit 1
-                fi
-                selected_tag="$custom_tag"
-                ;;
-            *)
-                print_error "Invalid option, operation cancelled"
-                exit 1
-                ;;
-        esac
     fi
 
     TAG_NAME="$selected_tag"
@@ -328,13 +288,9 @@ validate_tag_pattern() {
 }
 
 validate_tag() {
-    if ! is_main_branch; then
-        return 1
-    fi
-
     local tag="$1"
 
-    print_step "🔍" "Validating tag $tag..."
+    print_step "👮🏻‍♂️" "Validating tag $tag..."
 
     if validate_tag_pattern "$tag" "$SEMANTIC_VERSION_TAG_PATTERN"; then
         print_success "Valid semantic version tag: $tag"
@@ -349,9 +305,9 @@ validate_tag() {
 
     print_error "Invalid tag format: $tag"
     print_tip "Accepted formats:"
-    echo "  - Semantic version tag: v1.2.3"
-    echo "  - Ticket tag: FEATURE-123.1, FEATURE-456.2"
-    echo "  - Pre-release tag: v1.2.3-alpha, v1.2.3-beta"
+    echo "   - Semantic version tag: v1.2.3"
+    echo "   - Ticket tag: FEATURE-123.1, FEATURE-456.2"
+    echo "   - Pre-release tag: v1.2.3-alpha, v1.2.3-beta"
     return 1
 }
 
@@ -383,15 +339,13 @@ create_and_push_tag() {
     fi
 
     git tag "$tag" "$commit" -m "Build tag $tag"
-    print_success "Tag $tag created locally"
+    print_success "Tag created locally"
 
     if git remote | grep -q origin; then
-        print_step "📤" "Pushing tag to the remote repository..."
-
         if git push origin "$tag" >/dev/null 2>&1; then
-            print_success "Tag $tag pushed successfully"
+            print_success "Tag pushed to the remote repository"
         else
-            print_warning "Failed to push tag $tag"
+            print_warning "Failed to push tag to the remote repository"
         fi
     else
         print_info "No 'origin' remote configured, tag not pushed"
@@ -410,27 +364,29 @@ cleanup_temporary_tags() {
 
     local tag_count=$(echo "$tmp_tags" | wc -l | tr -d ' ')
     print_yellow "$tag_count temporary tags detected"
-    
+
     echo "$tmp_tags" | head -5 | while read tag; do
-        echo "     - $tag"
+        echo "   $tag"
     done
     if [ $tag_count -gt 5 ]; then
-        echo "     ... and $((tag_count - 5)) more"
+        echo "   ... and $((tag_count - 5)) more"
     fi
 
-    print_info "Deleting temporary tags..."
-    
+	echo ""
+    print_yellow "Deleting temporary tags on the local repository..."
+
     local deleted_count=0
     for tag in $tmp_tags; do
-        echo "     Deleting tag $tag"
         git tag -d "$tag" 2>/dev/null || true
         deleted_count=$((deleted_count + 1))
     done
-    
-    print_success "$deleted_count temporary tags deleted from the local repository"
 
-    print_info "Cleaning up temporary tags on the remote repository..."
-    local remote_tmp_tags=$(git ls-remote --tags origin | grep -E "$TEMPORARY_TAG_CLEANUP_PATTERN" | awk '{print $2}' | sed 's/refs\/tags\///' || true)
+    print_success "$deleted_count tags deleted from the local repository"
+
+	echo ""
+    print_yellow "Deleting temporary tags on the remote repository..."
+
+    local remote_tmp_tags=$(git ls-remote --tags origin | grep -v "\^{}" | awk '{print $2}' | sed 's/refs\/tags\///' | grep -E "$TEMPORARY_TAG_CLEANUP_PATTERN" || true)
 
 	if [ -z "$remote_tmp_tags" ]; then
 		print_success "No temporary tags to clean up on the remote repository"
@@ -439,16 +395,18 @@ cleanup_temporary_tags() {
 
 	local remote_deleted_count=0
 	for tag in $remote_tmp_tags; do
-		echo "     Deleting tag $tag"
-		git push --delete origin "$tag" 2>/dev/null || print_warning  "Tag $tag already deleted"
-		remote_deleted_count=$((remote_deleted_count + 1))
+		if git push --delete origin "$tag" 2>/dev/null; then
+			remote_deleted_count=$((remote_deleted_count + 1))
+		else
+			print_warning "Failed to delete tag $tag"
+		fi
 	done
 
 	print_success "$remote_deleted_count temporary tags deleted from the remote repository"
 }
 
-show_tag_inventory() {
-	print_step "📊" "Display tag inventory..."
+analyze_tag_inventory() {
+	print_step "📊" "Analyzing tag inventory..."
 
 	total_tags=$(git tag -l | wc -l | tr -d ' ')
 	tmp_tags=$(git tag -l | grep -E "$TEMPORARY_TAG_CLEANUP_PATTERN" | wc -l | tr -d ' ')
@@ -514,8 +472,10 @@ if [ -z "$TAG_NAME" ]; then
 fi
 
 # 1. Validate the tag
-if ! validate_tag "$TAG_NAME"; then
-    exit 1
+if is_main_branch; then
+	if ! validate_tag "$TAG_NAME"; then
+		exit 1
+	fi
 fi
 
 # 2. Check that the tag doesn't exist
@@ -536,13 +496,13 @@ fi
 
 # 5. Display tag inventory (only on the main branch)
 if is_main_branch; then
-	show_tag_inventory
+	analyze_tag_inventory
 fi
 
 print_yellow "\n🎉  Tag $TAG_NAME created successfully!"
 
 echo ""
 print_tip "Good practices:"
-echo "- Use this script to create all your tags"
-echo "- Avoid using 'git tag' and 'git push --tags' directly"
-echo "- Automatic cleanup keeps the repository clean"
+echo "   - Use this script to create all your tags"
+echo "   - Avoid using 'git tag' and 'git push --tags' directly"
+echo "   - Automatic cleanup keeps the repository clean"
