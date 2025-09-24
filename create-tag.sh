@@ -389,56 +389,56 @@ check_tag_exists() {
 }
 
 # Fonction de nettoyage automatique des tags temporaires
-auto_cleanup_temp_tags() {
+cleanup_temporary_tags() {
     echo ""
-    print_info "🧹 Nettoyage automatique des tags temporaires..."
+    print_info "🧹 Nettoyage des tags temporaires..."
 
-    # Pattern amélioré pour détecter tous les types de tags temporaires
-    temp_tags=$(git tag -l | grep -E "$TEMPORARY_TAG_CLEANUP_PATTERN" || true)
+    # Récupération des tags temporaires sur le dépôt local
+    tmp_tags=$(git tag -l | grep -E "$TEMPORARY_TAG_CLEANUP_PATTERN" || true)
     
-    if [ -z "$temp_tags" ]; then
+    if [ -z "$tmp_tags" ]; then
         print_success "Aucun tag temporaire à nettoyer"
         return 0
     fi
+
+    local tag_count=$(echo "$tmp_tags" | wc -l | tr -d ' ')
+    print_yellow "$tag_count tags temporaires détectés"
     
-    temp_count=$(echo "$temp_tags" | wc -l | tr -d ' ')
-    print_yellow "🔍 $temp_count tags temporaires détectés"
-    
-    # Affiche les premiers tags temporaires
-    echo "$temp_tags" | head -5 | while read tag; do
+    # Affichage des premiers tags et du nombre restant éventuel
+    echo "$tmp_tags" | head -5 | while read tag; do
         echo "     - $tag"
     done
-    
-    if [ $temp_count -gt 5 ]; then
-        echo "     ... et $((temp_count - 5)) autres"
+    if [ $tag_count -gt 5 ]; then
+        echo "     ... et $((tag_count - 5)) autres"
     fi
+
+    print_info "Suppression des tags temporaires..."
     
-    print_info "Suppression automatique des tags temporaires..."
-    
-    count=0
-    for tag in $temp_tags; do
-        echo "     Suppression: $tag"
+    local deleted_count=0
+    for tag in $tmp_tags; do
+        echo "     Suppression du tag '$tag'"
         git tag -d "$tag" 2>/dev/null || true
-        count=$((count + 1))
+        deleted_count=$((deleted_count + 1))
     done
     
-    print_success "$count tags temporaires supprimés localement"
-    
-    # Nettoyage des tags temporaires distants
-    print_info "Nettoyage des tags temporaires sur le remote..."
-    remote_temp_tags=$(git ls-remote --tags origin | grep -E "$TEMPORARY_TAG_CLEANUP_PATTERN" | awk '{print $2}' | sed 's/refs\/tags\///' || true)
-    
-    if [ ! -z "$remote_temp_tags" ]; then
-        remote_count=0
-        for tag in $remote_temp_tags; do
-            echo "     Suppression remote: $tag"
-            git push --delete origin "$tag" 2>/dev/null || echo "       ⚠️  Tag $tag déjà supprimé"
-            remote_count=$((remote_count + 1))
-        done
-        print_success "$remote_count tags temporaires distants supprimés"
-    else
-        print_success "Aucun tag temporaire distant à supprimer"
-    fi
+    print_success "$deleted_count tags temporaires supprimés sur le dépôt local"
+
+    print_info "Nettoyage des tags temporaires sur le dépôt distant..."
+    local remote_tmp_tags=$(git ls-remote --tags origin | grep -E "$TEMPORARY_TAG_CLEANUP_PATTERN" | awk '{print $2}' | sed 's/refs\/tags\///' || true)
+
+	if [ -z "$remote_tmp_tags" ]; then
+		print_success "Aucun tag temporaire distant à nettoyer"
+		return 0
+	fi
+
+	local remote_deleted_count=0
+	for tag in $remote_tmp_tags; do
+		echo "     Suppression du tag '$tag'"
+		git push --delete origin "$tag" 2>/dev/null || print_warning  "Tag '$tag' déjà supprimé"
+		remote_deleted_count=$((remote_deleted_count + 1))
+	done
+
+	print_success "$remote_deleted_count tags temporaires sur le dépôt distant"
 }
 
 # Fonction pour créer et pousser le tag
@@ -546,15 +546,15 @@ if ! check_tag_exists "$TAG_NAME"; then
     exit 1
 fi
 
-# 3. Nettoyage automatique (uniquement sur les branches principales)
-if is_main_branch; then
-    auto_cleanup_temp_tags
-fi
-
-# 4. Créer et pousser le tag
+# 3. Créer et pousser le tag
 COMMIT_HASH="${FILTERED_ARGS[1]:-$DEFAULT_COMMIT}"
 if ! create_and_push_tag "$TAG_NAME" "$COMMIT_HASH"; then
     exit 1
+fi
+
+# 4. Nettoyage automatique (uniquement sur les branches principales)
+if is_main_branch; then
+    cleanup_temporary_tags
 fi
 
 # 5. Afficher les statistiques finales
