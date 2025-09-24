@@ -17,8 +17,15 @@ readonly DEFAULT_COMMIT="HEAD"
 readonly DEFAULT_MAJOR_VERSION="v1.0.0"
 readonly DEFAULT_MINOR_VERSION="v0.1.0"
 
+# Patterns de tags - Définition des expressions régulières pour les différents types de tags
+# SEMANTIC_VERSION_TAG_PATTERN: Format standard vX.Y.Z (ex: v1.0.0)
+# TICKET_TAG_PATTERN: Format de ticket projet (ex: BACK-123.1)
+# PRERELEASE_TAG_PATTERN: Format de pré-release (ex: v1.2.3-alpha)
+# TEMPORARY_TAG_PATTERN: Format de tag temporaire (ex: v1.2.3_FRONT-123.1)
+# TEMPORARY_TAG_CLEANUP_PATTERN: Pattern pour identifier les tags temporaires à nettoyer
+
 readonly SEMANTIC_VERSION_TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+$'
-readonly TICKET_TAG_PATTERN='^(BACK|FRONT|CMP|CNS|PRTL)-[0-9]+\.[0-9]+$'
+readonly TICKET_TAG_PATTERN='^(BACK|FRONT)-[0-9]+\.[0-9]+$'
 readonly PRERELEASE_TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+-[a-z]+$'
 readonly TEMPORARY_TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+_.+\.[0-9]+$'
 readonly TEMPORARY_TAG_CLEANUP_PATTERN='_.*\.|_[A-Z]+-[0-9]+$'
@@ -96,7 +103,7 @@ is_main_branch() {
 }
 
 # Find the latest semantic tag on the main branch from which the current branch has diverged
-get_current_branch_base_tag() {
+get_branch_base_tag() {
     local current_branch=$(get_current_branch)
     local main_branch="master"
 
@@ -131,7 +138,7 @@ get_current_branch_base_tag() {
     fi
 }
 
-get_tmp_tag_next_suffix() {
+get_next_temp_suffix() {
     local latest_base_tag="$1"
     local branch="$2"
     local suffix=1
@@ -141,6 +148,18 @@ get_tmp_tag_next_suffix() {
     done
 
     echo "$suffix"
+}
+
+get_last_temp_tag() {
+    local base_tag="$1"
+    local branch="$2"
+    local last_suffix=$(($(get_next_temp_suffix "$base_tag" "$branch") - 1))
+
+    if [ "$last_suffix" -gt 0 ]; then
+        echo "${base_tag}_${branch}.${last_suffix}"
+    else
+        echo ""
+    fi
 }
 
 run_interactive_mode() {
@@ -239,12 +258,17 @@ run_interactive_mode() {
 			esac
 		fi
 	else
-		local latest_base_tag=$(get_current_branch_base_tag)
-		local next_suffix=$(get_tmp_tag_next_suffix "$latest_base_tag" "$current_branch")
+		local latest_base_tag=$(get_branch_base_tag)
+		local next_suffix=$(get_next_temp_suffix "$latest_base_tag" "$current_branch")
+		local last_temp_tag=$(get_last_temp_tag "$latest_base_tag" "$current_branch")
 		local next_tmp_tag="${latest_base_tag}_${current_branch}.${next_suffix}"
 
 		print_yellow "Latest tag: ${COLOR_CYAN}$latest_tag${COLOR_NONE}"
 		print_yellow "Latest base tag for this branch: ${COLOR_CYAN}$latest_base_tag${COLOR_NONE}"
+		if [ ! -z "$last_temp_tag" ]; then
+			print_yellow "Last temporary tag for this branch: ${COLOR_CYAN}$last_temp_tag${COLOR_NONE}"
+		fi
+
 		echo ""
 		print_tip "On a feature branch, only temporary tags are allowed. Final tags should be created on the main branch after merge."
 		print_step "Enter V to create the following tag or C to cancel:"
@@ -306,7 +330,7 @@ validate_tag() {
     print_error "Invalid tag format: $tag"
     print_tip "Accepted formats:"
     echo "   - Semantic version tag: v1.2.3"
-    echo "   - Ticket tag: FEATURE-123.1, FEATURE-456.2"
+    echo "   - Ticket tag: BACK-123.1, FRONT-456.2"
     echo "   - Pre-release tag: v1.2.3-alpha, v1.2.3-beta"
     return 1
 }
@@ -315,12 +339,12 @@ check_tag_exists() {
     local tag="$1"
 
     if git tag -l | grep -q "^$tag$"; then
-        print_error "Tag $tag already exists locally"
+        print_error "The tag $tag already exists locally"
         return 1
     fi
 
     if git ls-remote --tags origin | grep -q "refs/tags/$tag$"; then
-        print_error "Tag $tag already exists on the remote"
+        print_error "The tag $tag already exists on the remote"
         return 1
     fi
 
@@ -346,6 +370,7 @@ create_and_push_tag() {
             print_success "Tag pushed to the remote repository"
         else
             print_warning "Failed to push tag to the remote repository"
+            return 1
         fi
     else
         print_info "No 'origin' remote configured, tag not pushed"
@@ -356,7 +381,7 @@ cleanup_temporary_tags() {
     print_step "🧹" "Cleaning up temporary tags..."
 
     tmp_tags=$(git tag -l | grep -E "$TEMPORARY_TAG_CLEANUP_PATTERN" || true)
-    
+
     if [ -z "$tmp_tags" ]; then
         print_success "No temporary tags to clean up"
         return 0
@@ -408,9 +433,9 @@ cleanup_temporary_tags() {
 analyze_tag_inventory() {
 	print_step "📊" "Analyzing tag inventory..."
 
-	total_tags=$(git tag -l | wc -l | tr -d ' ')
-	tmp_tags=$(git tag -l | grep -E "$TEMPORARY_TAG_CLEANUP_PATTERN" | wc -l | tr -d ' ')
-	clean_tags=$((total_tags - tmp_tags))
+	local total_tags=$(git tag -l | wc -l | tr -d ' ')
+	local tmp_tags=$(git tag -l | grep -E "$TEMPORARY_TAG_CLEANUP_PATTERN" | wc -l | tr -d ' ')
+	local clean_tags=$((total_tags - tmp_tags))
 
 	echo "   Total tags: $total_tags"
 	echo "   Temporary tags: $tmp_tags"
@@ -463,9 +488,9 @@ if [ -z "$TAG_NAME" ]; then
         if ! [[ "$TAG_NAME" =~ $TEMPORARY_TAG_PATTERN ]]; then
             print_error "Invalid tag format: $TAG_NAME"
             print_tip "Accepted format:"
-            echo "  - Temporary tag: v1.2.3_BRANCH_NAME.1"
+            echo "   - Temporary tag: v1.2.3_BRANCH_NAME.1"
             print_tip "Only temporary tags are allowed on feature branches"
-            print_tip "It's recommenaded to use the interactive mode to create a temporary tag"
+            print_tip "It's recommended to use the interactive mode to create a temporary tag"
             exit 1
         fi
     fi
