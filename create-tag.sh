@@ -8,6 +8,7 @@ set -e
 readonly COLOR_BLUE='\033[0;34m'
 readonly COLOR_CYAN='\033[1;36m'
 readonly COLOR_GREEN='\033[0;32m'
+readonly COLOR_ORANGE='\033[0;33m'
 readonly COLOR_RED='\033[0;31m'
 readonly COLOR_YELLOW='\033[1;33m'
 readonly COLOR_NONE='\033[0m'
@@ -16,7 +17,7 @@ readonly DEFAULT_COMMIT="HEAD"
 readonly DEFAULT_MAJOR_VERSION="v1.0.0"
 readonly DEFAULT_MINOR_VERSION="v0.1.0"
 
-readonly SEMANTIC_TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+$'
+readonly SEMANTIC_VERSION_TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+$'
 readonly TICKET_TAG_PATTERN='^(BACK|FRONT|CMP|CNS|PRTL)-[0-9]+\.[0-9]+$'
 readonly PRERELEASE_TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+-[a-z]+$'
 readonly TEMPORARY_TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+_.+\.[0-9]+$'
@@ -34,6 +35,10 @@ print_green() {
   echo -e "${COLOR_GREEN}$1${COLOR_NONE}"
 }
 
+print_orange() {
+  echo -e "${COLOR_ORANGE}$1${COLOR_NONE}"
+}
+
 print_red() {
   echo -e "${COLOR_RED}$1${COLOR_NONE}"
 }
@@ -47,19 +52,19 @@ print_info() {
 }
 
 print_success() {
-    print_green "✅ $1"
+    print_green " ✅ $1"
 }
 
 print_warning() {
-    print_yellow "⚠️ $1"
+    print_orange "⚠️  $1"
 }
 
 print_error() {
-    print_red "❌ $1"
+    print_red " ❌ $1"
 }
 
 print_tip() {
-    print_yellow "💡 $1"
+    print_yellow "💡  $1"
 }
 
 print_option() {
@@ -74,11 +79,11 @@ print_header() {
 }
 
 print_step() {
-	print_info "\n$1"
+	print_info "\n$1  $2"
 }
 
 get_latest_semantic_tag() {
-    git tag -l | grep -E "$SEMANTIC_TAG_PATTERN" | sort -V | tail -1
+    git tag -l | grep -E "$SEMANTIC_VERSION_TAG_PATTERN" | sort -V | tail -1
 }
 
 get_current_branch() {
@@ -116,7 +121,7 @@ get_current_branch_base_tag() {
     fi
 
     # Find the latest semantic tag that contains this base commit
-    local base_tag=$(git tag -l --merged "$base_commit" | grep -E "$SEMANTIC_TAG_PATTERN" | sort -V | tail -1)
+    local base_tag=$(git tag -l --merged "$base_commit" | grep -E "$SEMANTIC_VERSION_TAG_PATTERN" | sort -V | tail -1)
 
     if [ -z "$base_tag" ]; then
         # If no tag is found at the base point, use the latest semantic tag
@@ -150,7 +155,7 @@ display_options() {
             print_yellow "Version to create:"
             print_option "1" "First version" "v1.0.0"
             print_option "2" "Development version" "v0.1.0"
-            print_option "3" "Enter manually"
+            print_option "3" "Enter tag manually"
             print_option "4" "Cancel"
             return 0
         fi
@@ -169,7 +174,7 @@ display_options() {
         print_option "1" "Patch - Bug fixes" "$next_patch"
         print_option "2" "Minor - New features" "$next_minor"
         print_option "3" "Major - Breaking changes" "$next_major"
-        print_option "4" "Enter manually"
+        print_option "4" "Enter tag manually"
         print_option "5" "Cancel"
     else
         local base_tag=$(get_current_branch_base_tag)
@@ -179,8 +184,7 @@ display_options() {
         print_yellow "Version to create:"
         print_option "1" "Temporary tag (based on $base_tag)" "$temp_tag"
         print_option "2" "Cancel"
-        echo ""
-        print_tip "On a feature branch, only temporary tags are allowed. Final tags should be created on the main branch after merging"
+        print_tip "\nOn a feature branch, only temporary tags are allowed. Final tags should be created on the main branch after merging"
     fi
 }
 
@@ -193,22 +197,23 @@ run_interactive_mode() {
     local latest_tag=$(get_latest_semantic_tag)
     local selected_tag=""
 
-    echo ""
-
     local initial_branch=$(get_current_branch)
     local initial_is_main=$(is_main_branch && echo "true" || echo "false")
 
     if [ -z "$latest_tag" ]; then
-        read -p "Select an option (1-4): " choice
+    	print_step "Select an option (1-4):"
+		read -r choice
         if [ "$choice" = "4" ]; then
-            print_yellow "🚫 Tag creation cancelled."
+            print_yellow "🚫  Tag creation cancelled."
             return 1
         fi
     else
         if is_main_branch; then
-            read -p "Select an option (1-5): " choice
+        	print_step "Select an option (1-5):"
+			read -r choice
         else
-            read -p "Select an option (1-2): " choice
+            print_step "Select an option (1-2):"
+			read -r choice
         fi
     fi
 
@@ -238,28 +243,28 @@ run_interactive_mode() {
             case $choice in
                 1)
                     selected_tag="$next_patch"
-                    print_success "Selected: $selected_tag (patch)"
+                    print_success "Selected tag: $selected_tag (patch)"
                     ;;
                 2)
                     selected_tag="$next_minor"
-                    print_success "Selected: $selected_tag (minor)"
+                    print_success "Selected tag: $selected_tag (minor)"
                     ;;
                 3)
                     selected_tag="$next_major"
-                    print_success "Selected: $selected_tag (major)"
+                    print_success "Selected tag: $selected_tag (major)"
                     ;;
                 4)
-                    echo ""
-                    print_yellow "Enter version number (format: vX.Y.Z): "
+                    print_blue "Enter tag:"
                     read -r custom_tag
                     if [ -z "$custom_tag" ]; then
                         print_error "Empty tag, operation cancelled"
                         exit 1
                     fi
                     selected_tag="$custom_tag"
+                    print_success "Selected tag: $selected_tag"
                     ;;
                 5)
-                    print_yellow "🚫 Tag creation cancelled."
+                    print_yellow "🚫  Tag creation cancelled."
                     exit 0
                     ;;
                 *)
@@ -275,10 +280,10 @@ run_interactive_mode() {
             case $choice in
                 1)
                     selected_tag="$temp_tag"
-                    print_success "Selected: $selected_tag"
+                    print_success "Selected tag: $selected_tag"
                     ;;
                 2)
-                    print_yellow "🚫 Tag creation cancelled."
+                    print_yellow "🚫  Tag creation cancelled."
                     exit 0
                     ;;
                 *)
@@ -291,15 +296,14 @@ run_interactive_mode() {
         case $choice in
             1)
                 selected_tag="$DEFAULT_MAJOR_VERSION"
-                print_success "Selected: $selected_tag (first version)"
+                print_success "Selected tag: $selected_tag (major)"
                 ;;
             2)
                 selected_tag="$DEFAULT_MINOR_VERSION"
-                print_success "Selected: $selected_tag (development version)"
+                print_success "Selected tag: $selected_tag (minor)"
                 ;;
             3)
-                echo ""
-                print_yellow "Enter version number (format: vX.Y.Z): "
+                print_blue "Enter tag:"
                 read -r custom_tag
                 if [ -z "$custom_tag" ]; then
                     print_error "Empty tag, operation cancelled"
@@ -314,9 +318,6 @@ run_interactive_mode() {
         esac
     fi
 
-    if is_main_branch; then
-        print_step "🚀 Applying selected tag: $selected_tag"
-    fi
     TAG_NAME="$selected_tag"
 }
 
@@ -333,9 +334,9 @@ validate_tag() {
 
     local tag="$1"
 
-    print_step "🔍 Validating tag '$tag'..."
+    print_step "🔍" "Validating tag $tag..."
 
-    if validate_tag_pattern "$tag" "$SEMANTIC_TAG_PATTERN"; then
+    if validate_tag_pattern "$tag" "$SEMANTIC_VERSION_TAG_PATTERN"; then
         print_success "Valid semantic version tag: $tag"
         return 0
     elif validate_tag_pattern "$tag" "$TICKET_TAG_PATTERN"; then
@@ -349,7 +350,7 @@ validate_tag() {
     print_error "Invalid tag format: $tag"
     print_tip "Accepted formats:"
     echo "  - Semantic version tag: v1.2.3"
-    echo "  - Ticket tag: BACK-123.1, FRONT-456.2"
+    echo "  - Ticket tag: FEATURE-123.1, FEATURE-456.2"
     echo "  - Pre-release tag: v1.2.3-alpha, v1.2.3-beta"
     return 1
 }
@@ -358,12 +359,12 @@ check_tag_exists() {
     local tag="$1"
 
     if git tag -l | grep -q "^$tag$"; then
-        print_error "Tag '$tag' already exists locally"
+        print_error "Tag $tag already exists locally"
         return 1
     fi
 
     if git ls-remote --tags origin | grep -q "refs/tags/$tag$"; then
-        print_error "Tag '$tag' already exists on the remote"
+        print_error "Tag $tag already exists on the remote"
         return 1
     fi
 
@@ -371,10 +372,10 @@ check_tag_exists() {
 }
 
 create_and_push_tag() {
-    print_step "🏷️  Creating tag '$tag'..."
-
     local tag="$1"
     local commit="$2"
+
+    print_step "🏷" "Creating tag $tag..."
 
     if ! git rev-parse --verify "$commit" >/dev/null 2>&1; then
         print_error "Commit '$commit' does not exist"
@@ -382,15 +383,15 @@ create_and_push_tag() {
     fi
 
     git tag "$tag" "$commit" -m "Build tag $tag"
-    print_success "Tag '$tag' created locally"
+    print_success "Tag $tag created locally"
 
     if git remote | grep -q origin; then
-        print_step "📤 Pushing tag to the remote repository..."
+        print_step "📤" "Pushing tag to the remote repository..."
 
         if git push origin "$tag" >/dev/null 2>&1; then
-            print_success "Tag '$tag' pushed successfully"
+            print_success "Tag $tag pushed successfully"
         else
-            print_warning "Failed to push tag '$tag'"
+            print_warning "Failed to push tag $tag"
         fi
     else
         print_info "No 'origin' remote configured, tag not pushed"
@@ -398,7 +399,7 @@ create_and_push_tag() {
 }
 
 cleanup_temporary_tags() {
-    print_step "🧹 Cleaning up temporary tags..."
+    print_step "🧹" "Cleaning up temporary tags..."
 
     tmp_tags=$(git tag -l | grep -E "$TEMPORARY_TAG_CLEANUP_PATTERN" || true)
     
@@ -421,7 +422,7 @@ cleanup_temporary_tags() {
     
     local deleted_count=0
     for tag in $tmp_tags; do
-        echo "     Deleting tag '$tag'"
+        echo "     Deleting tag $tag"
         git tag -d "$tag" 2>/dev/null || true
         deleted_count=$((deleted_count + 1))
     done
@@ -438,8 +439,8 @@ cleanup_temporary_tags() {
 
 	local remote_deleted_count=0
 	for tag in $remote_tmp_tags; do
-		echo "     Deleting tag '$tag'"
-		git push --delete origin "$tag" 2>/dev/null || print_warning  "Tag '$tag' already deleted"
+		echo "     Deleting tag $tag"
+		git push --delete origin "$tag" 2>/dev/null || print_warning  "Tag $tag already deleted"
 		remote_deleted_count=$((remote_deleted_count + 1))
 	done
 
@@ -447,7 +448,7 @@ cleanup_temporary_tags() {
 }
 
 show_tag_inventory() {
-	print_step "📊 Display tag inventory..."
+	print_step "📊" "Display tag inventory..."
 
 	total_tags=$(git tag -l | wc -l | tr -d ' ')
 	tmp_tags=$(git tag -l | grep -E "$TEMPORARY_TAG_CLEANUP_PATTERN" | wc -l | tr -d ' ')
@@ -458,7 +459,7 @@ show_tag_inventory() {
 	echo "   Clean tags: $clean_tags"
 
 	if [ $tmp_tags -eq 0 ]; then
-		print_green "🎉 The repository is perfectly cleaned up!"
+		print_success "The repository is perfectly cleaned up!"
 	fi
 }
 
@@ -499,7 +500,7 @@ if [ -z "$TAG_NAME" ]; then
 
     # If we're on a feature branch and a tag is provided via command line
     if [ ! -z "$TAG_NAME" ] && ! is_main_branch; then
-        print_step "🔍 Validation of the tag '$TAG_NAME'..."
+        print_step "🔍" "Validating tag $TAG_NAME..."
 
         if ! [[ "$TAG_NAME" =~ $TEMPORARY_TAG_PATTERN ]]; then
             print_error "Invalid tag format: $TAG_NAME"
@@ -538,11 +539,10 @@ if is_main_branch; then
 	show_tag_inventory
 fi
 
-echo ""
-print_green "🎉 Tag '$TAG_NAME' created successfully!"
+print_yellow "\n🎉  Tag $TAG_NAME created successfully!"
 
 echo ""
 print_tip "Good practices:"
-echo "   - Use this script to create all your tags"
-echo "   - Avoid using 'git tag' and 'git push --tags' directly"
-echo "   - Automatic cleanup keeps the repository clean"
+echo "- Use this script to create all your tags"
+echo "- Avoid using 'git tag' and 'git push --tags' directly"
+echo "- Automatic cleanup keeps the repository clean"
