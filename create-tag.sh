@@ -18,6 +18,13 @@ readonly DEFAULT_COMMIT="HEAD"
 readonly DEFAULT_MAJOR_VERSION="v1.0.0"
 readonly DEFAULT_MINOR_VERSION="v0.1.0"
 
+# Patterns de tags
+readonly SEMANTIC_TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+$'
+readonly TICKET_TAG_PATTERN='^(BACK|FRONT|CMP|CNS|PRTL)-[0-9]+\.[0-9]+$'
+readonly PRERELEASE_TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+-[a-z]+$'
+readonly TEMPORARY_TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+_.+\.[0-9]+$'
+readonly TEMPORARY_TAG_CLEANUP_PATTERN='_.*\.|_[A-Z]+-[0-9]+$'
+
 # Fonctions d'affichage pour factoriser les messages
 print_blue() {
   echo -e "${COLOR_BLUE}$1${COLOR_NONE}"
@@ -81,7 +88,7 @@ fi
 
 # Fonction pour obtenir le dernier tag sémantique
 get_latest_semantic_tag() {
-    git tag -l | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" | sort -V | tail -1
+    git tag -l | grep -E "$SEMANTIC_TAG_PATTERN" | sort -V | tail -1
 }
 
 # Fonction pour obtenir la branche courante
@@ -129,7 +136,7 @@ get_branch_base_tag() {
     fi
 
     # Trouver le tag sémantique le plus récent qui contient ce commit de base
-    local base_tag=$(git tag -l --merged "$base_commit" | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+$" | sort -V | tail -1)
+    local base_tag=$(git tag -l --merged "$base_commit" | grep -E "$SEMANTIC_TAG_PATTERN" | sort -V | tail -1)
 
     if [ -z "$base_tag" ]; then
         # Si aucun tag trouvé au point de base, utiliser le dernier tag sémantique
@@ -362,13 +369,17 @@ fi
 if [ -z "$TAG_NAME" ]; then
     TAG_NAME="${FILTERED_ARGS[0]}"
 
-    # Vérifier si on essaie de créer un tag final sur une branche secondaire
+    # Si on est sur une branche secondaire et qu'un tag est fourni en ligne de commande
     if [ ! -z "$TAG_NAME" ] && ! is_main_branch; then
-        # Vérifier si c'est un tag sémantique (final)
-        if [[ "$TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ "$TAG_NAME" =~ ^(BACK|FRONT|CMP|CNS|PRTL)-[0-9]+\.[0-9]+$ ]]; then
-            print_error "Impossible de créer un tag final sur une branche secondaire"
-            print_tip "Les tags finaux doivent être créés sur la branche principale (master/main)"
-            print_tip "Utilisez le mode interactif pour créer des tags temporaires: git create-tag"
+        echo ""
+        print_info "🔍 Validation du tag '$TAG_NAME'..."
+
+        if ! [[ "$TAG_NAME" =~ $TEMPORARY_TAG_PATTERN ]]; then
+            print_error "Format de tag non valide: $TAG_NAME"
+            print_tip "Format accepté:"
+            echo "  - Tag temporaire: v1.2.3_NOM_BRANCHE.1"
+            print_tip "Seuls les tags temporaires sont autorisés sur les branches secondaires"
+            print_tip "Utilisez le mode interactif pour créer un tag temporaire"
             exit 1
         fi
     fi
@@ -376,48 +387,41 @@ fi
 
 COMMIT_HASH="${FILTERED_ARGS[1]:-$DEFAULT_COMMIT}"
 
-# Fonction pour valider le format du tag
-validate_tag_format() {
+# Fonction pour vérifier si un tag correspond à un pattern donné
+validate_tag_pattern() {
     local tag="$1"
-    
-    # Patterns acceptés pour les tags sémantiques
-    if [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        print_success "Tag de version sémantique valide: $tag"
-        return 0
-    elif [[ "$tag" =~ ^(BACK|FRONT|CMP|CNS|PRTL)-[0-9]+\.[0-9]+$ ]]; then
-        print_success "Tag de ticket valide: $tag"
-        return 0
-    elif [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-[a-z]+$ ]]; then
-        print_warning "Tag de pré-release: $tag"
-        print_yellow "   Assurez-vous que c'est intentionnel."
-        return 0
-    elif [[ "$tag" =~ _.*\. ]]; then
-        # Tags temporaires - autorisés uniquement sur les branches secondaires
-        if ! is_main_branch; then
-            print_success "Tag temporaire valide: $tag"
-            return 0
-        else
-            print_error "Les tags temporaires ne sont pas autorisés sur les branches principales"
-            print_tip "Utilisez un tag sémantique (v1.2.3) ou de ticket (BACK-123.1)"
-            return 1
-        fi
-    else
-        print_error "Format de tag non valide: $tag"
-        print_success "Formats acceptés:"
-        if is_main_branch; then
-            echo "  - Versions sémantiques: v1.2.3"
-            echo "  - Tags de tickets: BACK-123.1, FRONT-456.2"
-            echo "  - Pré-releases: v1.2.3-alpha, v1.2.3-beta"
-        else
-            echo "  - Tags temporaires: v1.2.3_BRANCHE.1"
-            echo "  - Versions sémantiques: v1.2.3 (non recommandé)"
-            echo "  - Tags de tickets: BACK-123.1 (non recommandé)"
-        fi
-        print_error "Formats interdits:"
-        echo "  - Tags de test: v1.2.3_testing.1"
-        echo "  - Tags non sémantiques: fix_something_v1"
+    local pattern="$2"
+    [[ "$tag" =~ $pattern ]]
+}
+
+# Fonction pour valider le format du tag
+validate_tag() {
+    if ! is_main_branch; then
         return 1
     fi
+
+    local tag="$1"
+
+    echo ""
+    print_info "🔍 Validation du tag '$tag'..."
+
+    if validate_tag_pattern "$tag" "$SEMANTIC_TAG_PATTERN"; then
+        print_success "Tag de version sémantique valide: $tag"
+        return 0
+    elif validate_tag_pattern "$tag" "$TICKET_TAG_PATTERN"; then
+        print_success "Tag de ticket valide: $tag"
+        return 0
+    elif validate_tag_pattern "$tag" "$PRERELEASE_TAG_PATTERN"; then
+        print_warning "Tag de pré-release: $tag"
+        return 0
+    fi
+
+    print_error "Format de tag non valide: $tag"
+    print_tip "Formats acceptés:"
+    echo "  - Tag sémantique: v1.2.3"
+    echo "  - Tag de ticket: BACK-123.1, FRONT-456.2"
+    echo "  - Pré-release: v1.2.3-alpha, v1.2.3-beta"
+    return 1
 }
 
 # Fonction pour vérifier si le tag existe déjà
@@ -443,7 +447,7 @@ auto_cleanup_temp_tags() {
     print_info "🧹 Nettoyage automatique des tags temporaires..."
 
     # Pattern amélioré pour détecter tous les types de tags temporaires
-    temp_tags=$(git tag -l | grep -E "_.*\.|_[A-Z]+-[0-9]+$" || true)
+    temp_tags=$(git tag -l | grep -E "$TEMPORARY_TAG_CLEANUP_PATTERN" || true)
     
     if [ -z "$temp_tags" ]; then
         print_success "Aucun tag temporaire à nettoyer"
@@ -475,7 +479,7 @@ auto_cleanup_temp_tags() {
     
     # Nettoyage des tags temporaires distants
     print_info "Nettoyage des tags temporaires sur le remote..."
-    remote_temp_tags=$(git ls-remote --tags origin | grep -E "_.*\.|_[A-Z]+-[0-9]+$" | awk '{print $2}' | sed 's/refs\/tags\///' || true)
+    remote_temp_tags=$(git ls-remote --tags origin | grep -E "$TEMPORARY_TAG_CLEANUP_PATTERN" | awk '{print $2}' | sed 's/refs\/tags\///' || true)
     
     if [ ! -z "$remote_temp_tags" ]; then
         remote_count=0
@@ -520,7 +524,7 @@ show_final_stats() {
         echo ""
         print_info "📊 Statistiques finales:"
         total_tags=$(git tag -l | wc -l | tr -d ' ')
-        temp_tags=$(git tag -l | grep -E "_.*\.|_[A-Z]+-[0-9]+$" | wc -l | tr -d ' ')
+        temp_tags=$(git tag -l | grep -E "$TEMPORARY_TAG_CLEANUP_PATTERN" | wc -l | tr -d ' ')
         clean_tags=$((total_tags - temp_tags))
 
         echo "   Total des tags: $total_tags"
@@ -534,14 +538,8 @@ show_final_stats() {
 }
 
 # MAIN EXECUTION
-if is_main_branch; then
-    echo ""
-    print_info "🔍 Validation du tag '$TAG_NAME'..."
-
-    # 1. Valider le format du tag (uniquement sur branches principales)
-    if ! validate_tag_format "$TAG_NAME"; then
-        exit 1
-    fi
+if ! validate_tag "$TAG_NAME"; then
+    exit 1
 fi
 
 # 2. Vérifier que le tag n'existe pas déjà
