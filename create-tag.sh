@@ -77,6 +77,10 @@ print_header() {
     print_cyan "$1"
 }
 
+print_step() {
+	print_info "\n$1"
+}
+
 # Fonction pour obtenir le dernier tag sémantique
 get_latest_semantic_tag() {
     git tag -l | grep -E "$SEMANTIC_TAG_PATTERN" | sort -V | tail -1
@@ -328,8 +332,7 @@ interactive_tag_creation() {
 
     # Appliquer le tag sélectionné
     if is_main_branch; then
-        echo ""
-        print_info "🚀 Application du tag sélectionné: $selected_tag"
+        print_step "🚀 Application du tag sélectionné: $selected_tag"
     fi
     TAG_NAME="$selected_tag"
 }
@@ -349,8 +352,7 @@ validate_tag() {
 
     local tag="$1"
 
-    echo ""
-    print_info "🔍 Validation du tag '$tag'..."
+    print_step "🔍 Validation du tag '$tag'..."
 
     if validate_tag_pattern "$tag" "$SEMANTIC_TAG_PATTERN"; then
         print_success "Tag de version sémantique valide: $tag"
@@ -393,8 +395,7 @@ create_and_push_tag() {
     local tag="$1"
     local commit="$2"
 
-    echo ""
-    print_info "🏷️  Création du tag '$tag'..."
+    print_step "🏷️  Création du tag '$tag'..."
 
     # Vérifier que le commit existe
     if ! git rev-parse --verify "$commit" >/dev/null 2>&1; then
@@ -408,8 +409,7 @@ create_and_push_tag() {
 
     # Pousser le tag vers le dépôt distant
     if git remote | grep -q origin; then
-        echo ""
-        print_info "📤 Envoi du tag vers le dépôt distant..."
+        print_step "📤 Envoi du tag vers le dépôt distant..."
 
         if git push origin "$tag" >/dev/null 2>&1; then
             print_success "Tag '$tag' poussé avec succès"
@@ -423,8 +423,7 @@ create_and_push_tag() {
 
 # Fonction de nettoyage automatique des tags temporaires
 cleanup_temporary_tags() {
-    echo ""
-    print_info "🧹 Nettoyage des tags temporaires..."
+    print_step "🧹 Nettoyage des tags temporaires..."
 
     # Récupération des tags temporaires sur le dépôt local
     tmp_tags=$(git tag -l | grep -E "$TEMPORARY_TAG_CLEANUP_PATTERN" || true)
@@ -476,8 +475,7 @@ cleanup_temporary_tags() {
 
 # Fonction pour afficher l'inventaire des tags
 show_tag_inventory() {
-	echo ""
-	print_info "📊 Statistiques finales:"
+	print_step "📊 Statistiques finales:"
 	total_tags=$(git tag -l | wc -l | tr -d ' ')
 	tmp_tags=$(git tag -l | grep -E "$TEMPORARY_TAG_CLEANUP_PATTERN" | wc -l | tr -d ' ')
 	clean_tags=$((total_tags - tmp_tags))
@@ -524,8 +522,7 @@ if [ -z "$TAG_NAME" ]; then
 
     # Si on est sur une branche secondaire et qu'un tag est fourni en ligne de commande
     if [ ! -z "$TAG_NAME" ] && ! is_main_branch; then
-        echo ""
-        print_info "🔍 Validation du tag '$TAG_NAME'..."
+        print_step "🔍 Validation du tag '$TAG_NAME'..."
 
         if ! [[ "$TAG_NAME" =~ $TEMPORARY_TAG_PATTERN ]]; then
             print_error "Format de tag non valide: $TAG_NAME"
