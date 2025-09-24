@@ -143,7 +143,6 @@ is_main_branch() {
 # Fonction pour suggérer les prochaines versions
 suggest_next_versions() {
     local latest_tag=$(get_latest_semantic_tag)
-    local interactive_mode=${1:-false}
     local current_branch=$(get_current_branch)
 
     print_yellow "Branche courante: ${COLOR_BLUE}$current_branch${COLOR_NONE}"
@@ -151,15 +150,10 @@ suggest_next_versions() {
     if [ -z "$latest_tag" ]; then
         print_yellow "Aucun tag sémantique trouvé"
         print_yellow "Version à créer:"
-        if [ "$interactive_mode" = true ]; then
-            print_option "1" "Première version" "v1.0.0"
-            print_option "2" "Version de développement" "v0.1.0"
-            print_option "3" "Saisir manuellement"
-            print_option "4" "Annuler"
-        else
-            print_option "1" "Première version" "v1.0.0"
-            print_option "2" "Version de développement" "v0.1.0"
-        fi
+        print_option "1" "Première version" "v1.0.0"
+        print_option "2" "Version de développement" "v0.1.0"
+        print_option "3" "Saisir manuellement"
+        print_option "4" "Annuler"
         return 0
     fi
 
@@ -172,30 +166,8 @@ suggest_next_versions() {
     print_yellow "Dernier tag: ${COLOR_BLUE}$latest_tag${COLOR_NONE}"
     print_yellow "Version à créer:"
 
-    if [ "$interactive_mode" = true ]; then
-        if is_main_branch; then
-            # Branche principale : tags sémantiques seulement
-            local next_patch="v$major.$minor.$((patch + 1))"
-            local next_minor="v$major.$((minor + 1)).0"
-            local next_major="v$((major + 1)).0.0"
-
-            print_option "1" "Correctif (patch) - Corrections de bugs" "$next_patch"
-            print_option "2" "Fonctionnalité (minor) - Nouvelles fonctionnalités" "$next_minor"
-            print_option "3"  "Majeure (major) - Changements non rétrocompatibles" "$next_major"
-            print_option "4" "Saisir manuellement"
-            print_option "5" "Annuler"
-        else
-            # Branche secondaire : uniquement des tags temporaires basés sur le tag de base de branche
-            local base_tag=$(get_branch_base_tag)
-            local next_suffix=$(get_next_temp_suffix "$base_tag" "$current_branch")
-            local temp_tag="${base_tag}_${current_branch}.${next_suffix}"
-
-            print_option "1" "Tag temporaire (basé sur $base_tag)" "$temp_tag"
-            print_option "2" "Annuler"
-            echo ""
-            print_tip "Sur une branche secondaire, seuls les tags temporaires sont autorisés, les tags finaux doivent être créés sur la branche principale après merge"
-        fi
-    else
+    if is_main_branch; then
+        # Branche principale : tags sémantiques seulement
         local next_patch="v$major.$minor.$((patch + 1))"
         local next_minor="v$major.$((minor + 1)).0"
         local next_major="v$((major + 1)).0.0"
@@ -203,11 +175,18 @@ suggest_next_versions() {
         print_option "1" "Correctif (patch) - Corrections de bugs" "$next_patch"
         print_option "2" "Fonctionnalité (minor) - Nouvelles fonctionnalités" "$next_minor"
         print_option "3"  "Majeure (major) - Changements non rétrocompatibles" "$next_major"
+        print_option "4" "Saisir manuellement"
+        print_option "5" "Annuler"
+    else
+        # Branche secondaire : uniquement des tags temporaires basés sur le tag de base de branche
+        local base_tag=$(get_branch_base_tag)
+        local next_suffix=$(get_next_temp_suffix "$base_tag" "$current_branch")
+        local temp_tag="${base_tag}_${current_branch}.${next_suffix}"
 
-        if ! is_main_branch; then
-            local temp_patch="${next_patch}_${current_branch}.1"
-            print_option "1"  "Tag temporaire" "$temp_patch"
-        fi
+        print_option "1" "Tag temporaire (basé sur $base_tag)" "$temp_tag"
+        print_option "2" "Annuler"
+        echo ""
+        print_tip "Sur une branche secondaire, seuls les tags temporaires sont autorisés, les tags finaux doivent être créés sur la branche principale après merge"
     fi
 }
 
@@ -215,7 +194,7 @@ suggest_next_versions() {
 interactive_tag_creation() {
     echo ""
 
-    suggest_next_versions true
+    suggest_next_versions
 
     local current_branch=$(get_current_branch)
     local latest_tag=$(get_latest_semantic_tag)
