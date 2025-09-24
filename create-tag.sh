@@ -142,47 +142,47 @@ is_main_branch() {
 
 # Fonction pour suggérer les prochaines versions
 suggest_next_versions() {
-    local latest_tag=$(get_latest_semantic_tag)
     local current_branch=$(get_current_branch)
 
     print_yellow "Branche courante: ${COLOR_BLUE}$current_branch${COLOR_NONE}"
 
-    if [ -z "$latest_tag" ]; then
-        print_yellow "Aucun tag sémantique trouvé"
-        print_yellow "Version à créer:"
-        print_option "1" "Première version" "v1.0.0"
-        print_option "2" "Version de développement" "v0.1.0"
-        print_option "3" "Saisir manuellement"
-        print_option "4" "Annuler"
-        return 0
-    fi
-
-    # Extraire les numéros de version
-    local version_numbers=$(echo "$latest_tag" | sed 's/^v//' | tr '.' ' ')
-    local major=$(echo $version_numbers | awk '{print $1}')
-    local minor=$(echo $version_numbers | awk '{print $2}')
-    local patch=$(echo $version_numbers | awk '{print $3}')
-
-    print_yellow "Dernier tag: ${COLOR_BLUE}$latest_tag${COLOR_NONE}"
-    print_yellow "Version à créer:"
-
     if is_main_branch; then
+        local latest_tag=$(get_latest_semantic_tag)
+        if [ -z "$latest_tag" ]; then
+            print_yellow "Aucun tag sémantique trouvé"
+            print_yellow "Version à créer:"
+            print_option "1" "Première version" "v1.0.0"
+            print_option "2" "Version de développement" "v0.1.0"
+            print_option "3" "Saisir manuellement"
+            print_option "4" "Annuler"
+            return 0
+        fi
+
+        # Calculer les versions suivantes
+        local version_numbers=$(echo "$latest_tag" | sed 's/^v//' | tr '.' ' ')
+        local major=$(echo $version_numbers | awk '{print $1}')
+        local minor=$(echo $version_numbers | awk '{print $2}')
+        local patch=$(echo $version_numbers | awk '{print $3}')
+
         # Branche principale : tags sémantiques seulement
         local next_patch="v$major.$minor.$((patch + 1))"
         local next_minor="v$major.$((minor + 1)).0"
         local next_major="v$((major + 1)).0.0"
 
+        print_yellow "Dernier tag: ${COLOR_BLUE}$latest_tag${COLOR_NONE}"
+        print_yellow "Version à créer:"
         print_option "1" "Correctif (patch) - Corrections de bugs" "$next_patch"
         print_option "2" "Fonctionnalité (minor) - Nouvelles fonctionnalités" "$next_minor"
         print_option "3"  "Majeure (major) - Changements non rétrocompatibles" "$next_major"
         print_option "4" "Saisir manuellement"
         print_option "5" "Annuler"
     else
-        # Branche secondaire : uniquement des tags temporaires basés sur le tag de base de branche
+        # Branche secondaire : uniquement des tags temporaires
         local base_tag=$(get_branch_base_tag)
         local next_suffix=$(get_next_temp_suffix "$base_tag" "$current_branch")
         local temp_tag="${base_tag}_${current_branch}.${next_suffix}"
 
+        print_yellow "Version à créer:"
         print_option "1" "Tag temporaire (basé sur $base_tag)" "$temp_tag"
         print_option "2" "Annuler"
         echo ""
@@ -285,7 +285,7 @@ interactive_tag_creation() {
             case $choice in
                 1)
                     selected_tag="$temp_tag"
-                    print_yellow "✅ Sélectionné: $selected_tag"
+                    print_success "Sélectionné: $selected_tag"
                     ;;
                 2)
                     print_yellow "🚫 Création de tag annulée."
@@ -338,9 +338,9 @@ for arg in "$@"; do
         print_error "Option inconnue: $arg"
         print_info "Ce script n'accepte aucune option."
         print_info "Usage:"
-        echo "  $0                # Mode interactif"
-        echo "  $0 <tag-name>     # Création directe"
-        echo "  $0 <tag-name> <commit-hash>"
+        echo "  $0                            # Mode interactif"
+        echo "  $0 <tag-name>                 # Création directe à partir du commit actuel"
+        echo "  $0 <tag-name> <commit-hash>   # Création directe à partir d'un commit spécifique"
         exit 1
     else
         FILTERED_ARGS+=("$arg")
@@ -356,7 +356,7 @@ fi
 # Si on arrive ici, on a soit un tag fourni, soit on vient du mode interactif
 if [ -z "$TAG_NAME" ]; then
     TAG_NAME="${FILTERED_ARGS[0]}"
-    
+
     # Vérifier si on essaie de créer un tag final sur une branche secondaire
     if [ ! -z "$TAG_NAME" ] && ! is_main_branch; then
         # Vérifier si c'est un tag sémantique (final)
@@ -492,7 +492,7 @@ create_and_push_tag() {
 
     echo ""
     print_info "🏷️  Création du tag '$tag'..."
-    
+
     # Vérifier que le commit existe
     if ! git rev-parse --verify "$commit" >/dev/null 2>&1; then
         print_error "Le commit '$commit' n'existe pas"
@@ -502,7 +502,7 @@ create_and_push_tag() {
     # Créer le tag
     git tag "$tag" "$commit" -m "Build tag $tag"
     print_success "Tag '$tag' créé localement"
-    
+
     # Pousser le tag
     print_info "📤 Push du tag vers le remote..."
     git push origin "$tag"
@@ -517,11 +517,11 @@ show_final_stats() {
         total_tags=$(git tag -l | wc -l | tr -d ' ')
         temp_tags=$(git tag -l | grep -E "_.*\.|_[A-Z]+-[0-9]+$" | wc -l | tr -d ' ')
         clean_tags=$((total_tags - temp_tags))
-        
+
         echo "   Total des tags: $total_tags"
         echo "   Tags temporaires: $temp_tags"
         echo "   Tags propres: $clean_tags"
-        
+
         if [ $temp_tags -eq 0 ]; then
             print_green "🎉 Dépôt parfaitement nettoyé !"
         fi
@@ -532,7 +532,7 @@ show_final_stats() {
 if is_main_branch; then
     echo ""
     print_info "🔍 Validation du tag '$TAG_NAME'..."
-    
+
     # 1. Valider le format du tag (uniquement sur branches principales)
     if ! validate_tag_format "$TAG_NAME"; then
         exit 1
@@ -562,7 +562,7 @@ print_green "🎉 Tag '$TAG_NAME' créé avec succès !"
 
 if is_main_branch; then
     print_info "Le dépôt a été automatiquement nettoyé des tags temporaires."
-    
+
     # Message de bonnes pratiques pour les branches principales
     echo ""
     print_tip "Bonnes pratiques:"
@@ -571,5 +571,5 @@ if is_main_branch; then
     echo "   - Le nettoyage automatique maintient un dépôt propre"
 else
     # Message simplifié pour les branches secondaires
-    print_success "Tag temporaire créé pour le développement sur cette branche."
+    print_success "Tag temporaire créé pour déployer le développement sur cette branche."
 fi
