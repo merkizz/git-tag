@@ -77,15 +77,6 @@ print_header() {
     print_cyan "$1"
 }
 
-print_header "🏷️  Script intelligent de création de tags"
-print_header "=========================================="
-
-# Vérification que nous sommes dans un dépôt Git
-if ! git rev-parse --git-dir > /dev/null 2>&1; then
-    print_error "Erreur: Ce script doit être exécuté dans un dépôt Git"
-    exit 1
-fi
-
 # Fonction pour obtenir le dernier tag sémantique
 get_latest_semantic_tag() {
     git tag -l | grep -E "$SEMANTIC_TAG_PATTERN" | sort -V | tail -1
@@ -343,50 +334,6 @@ interactive_tag_creation() {
     TAG_NAME="$selected_tag"
 }
 
-# Valider les arguments - rejeter toute option inconnue
-FILTERED_ARGS=()
-for arg in "$@"; do
-    if [[ "$arg" =~ ^-- ]]; then
-        print_error "Option inconnue: $arg"
-        print_info "Ce script n'accepte aucune option."
-        print_info "Usage:"
-        echo "  $0                            # Mode interactif"
-        echo "  $0 <tag-name>                 # Création directe à partir du commit actuel"
-        echo "  $0 <tag-name> <commit-hash>   # Création directe à partir d'un commit spécifique"
-        exit 1
-    else
-        FILTERED_ARGS+=("$arg")
-    fi
-done
-
-# Mode interactif par défaut si aucun tag fourni
-if [ ${#FILTERED_ARGS[@]} -lt 1 ]; then
-    # Lancer le mode interactif par défaut
-    interactive_tag_creation
-fi
-
-# Si on arrive ici, on a soit un tag fourni, soit on vient du mode interactif
-if [ -z "$TAG_NAME" ]; then
-    TAG_NAME="${FILTERED_ARGS[0]}"
-
-    # Si on est sur une branche secondaire et qu'un tag est fourni en ligne de commande
-    if [ ! -z "$TAG_NAME" ] && ! is_main_branch; then
-        echo ""
-        print_info "🔍 Validation du tag '$TAG_NAME'..."
-
-        if ! [[ "$TAG_NAME" =~ $TEMPORARY_TAG_PATTERN ]]; then
-            print_error "Format de tag non valide: $TAG_NAME"
-            print_tip "Format accepté:"
-            echo "  - Tag temporaire: v1.2.3_NOM_BRANCHE.1"
-            print_tip "Seuls les tags temporaires sont autorisés sur les branches secondaires"
-            print_tip "Utilisez le mode interactif pour créer un tag temporaire"
-            exit 1
-        fi
-    fi
-fi
-
-COMMIT_HASH="${FILTERED_ARGS[1]:-$DEFAULT_COMMIT}"
-
 # Fonction pour vérifier si un tag correspond à un pattern donné
 validate_tag_pattern() {
     local tag="$1"
@@ -538,6 +485,58 @@ show_final_stats() {
 }
 
 # MAIN EXECUTION
+
+print_header "🏷️  Script intelligent de création de tags"
+print_header "=========================================="
+
+# Valider les arguments - rejeter toute option inconnue
+FILTERED_ARGS=()
+for arg in "$@"; do
+    if [[ "$arg" =~ ^-- ]]; then
+        print_error "Option inconnue: $arg"
+        print_info "Ce script n'accepte aucune option."
+        print_info "Usage:"
+        echo "  $0                            # Mode interactif"
+        echo "  $0 <tag-name>                 # Création directe à partir du commit actuel"
+        echo "  $0 <tag-name> <commit-hash>   # Création directe à partir d'un commit spécifique"
+        exit 1
+    else
+        FILTERED_ARGS+=("$arg")
+    fi
+done
+
+# Mode interactif par défaut si aucun tag fourni
+if [ ${#FILTERED_ARGS[@]} -lt 1 ]; then
+    # Lancer le mode interactif par défaut
+    interactive_tag_creation
+fi
+
+# Si on arrive ici, on a soit un tag fourni, soit on vient du mode interactif
+if [ -z "$TAG_NAME" ]; then
+    TAG_NAME="${FILTERED_ARGS[0]}"
+
+    # Si on est sur une branche secondaire et qu'un tag est fourni en ligne de commande
+    if [ ! -z "$TAG_NAME" ] && ! is_main_branch; then
+        echo ""
+        print_info "🔍 Validation du tag '$TAG_NAME'..."
+
+        if ! [[ "$TAG_NAME" =~ $TEMPORARY_TAG_PATTERN ]]; then
+            print_error "Format de tag non valide: $TAG_NAME"
+            print_tip "Format accepté:"
+            echo "  - Tag temporaire: v1.2.3_NOM_BRANCHE.1"
+            print_tip "Seuls les tags temporaires sont autorisés sur les branches secondaires"
+            print_tip "Utilisez le mode interactif pour créer un tag temporaire"
+            exit 1
+        fi
+    fi
+fi
+
+# Vérification que nous sommes dans un dépôt Git
+if ! git rev-parse --git-dir > /dev/null 2>&1; then
+    print_error "Erreur: Ce script doit être exécuté dans un dépôt Git"
+    exit 1
+fi
+
 if ! validate_tag "$TAG_NAME"; then
     exit 1
 fi
@@ -553,6 +552,7 @@ if is_main_branch; then
 fi
 
 # 4. Créer et pousser le tag
+COMMIT_HASH="${FILTERED_ARGS[1]:-$DEFAULT_COMMIT}"
 if ! create_and_push_tag "$TAG_NAME" "$COMMIT_HASH"; then
     exit 1
 fi
