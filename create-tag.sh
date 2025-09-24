@@ -465,23 +465,21 @@ create_and_push_tag() {
     print_success "Tag '$tag' poussé sur le remote"
 }
 
-# Fonction pour afficher les statistiques finales
-show_final_stats() {
-    if is_main_branch; then
-        echo ""
-        print_info "📊 Statistiques finales:"
-        total_tags=$(git tag -l | wc -l | tr -d ' ')
-        temp_tags=$(git tag -l | grep -E "$TEMPORARY_TAG_CLEANUP_PATTERN" | wc -l | tr -d ' ')
-        clean_tags=$((total_tags - temp_tags))
+# Fonction pour afficher l'inventaire des tags
+show_tag_inventory() {
+	echo ""
+	print_info "📊 Statistiques finales:"
+	total_tags=$(git tag -l | wc -l | tr -d ' ')
+	tmp_tags=$(git tag -l | grep -E "$TEMPORARY_TAG_CLEANUP_PATTERN" | wc -l | tr -d ' ')
+	clean_tags=$((total_tags - tmp_tags))
 
-        echo "   Total des tags: $total_tags"
-        echo "   Tags temporaires: $temp_tags"
-        echo "   Tags propres: $clean_tags"
+	echo "   Total des tags: $total_tags"
+	echo "   Tags temporaires: $tmp_tags"
+	echo "   Tags propres: $clean_tags"
 
-        if [ $temp_tags -eq 0 ]; then
-            print_green "🎉 Dépôt parfaitement nettoyé !"
-        fi
-    fi
+	if [ $tmp_tags -eq 0 ]; then
+		print_green "🎉 Dépôt parfaitement nettoyé !"
+	fi
 }
 
 # MAIN EXECUTION
@@ -557,8 +555,10 @@ if is_main_branch; then
     cleanup_temporary_tags
 fi
 
-# 5. Afficher les statistiques finales
-show_final_stats
+# 5. Affichage de l'inventaire des tags
+if is_main_branch; then
+	show_tag_inventory
+fi
 
 echo ""
 print_green "🎉 Tag '$TAG_NAME' créé avec succès !"
