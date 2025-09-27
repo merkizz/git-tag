@@ -170,7 +170,7 @@ run_interactive_mode() {
     local latest_tag=$(get_latest_semantic_tag)
     local selected_tag=""
 
-	print_yellow "Current branch: ${COLOR_BLUE}$current_branch${COLOR_NONE}"
+	print_yellow "Current branch: ${COLOR_CYAN}$current_branch${COLOR_NONE}"
 
 	if is_main_branch; then
 		if [ -z "$latest_tag" ]; then
@@ -266,7 +266,7 @@ run_interactive_mode() {
 		print_yellow "Latest tag: ${COLOR_CYAN}$latest_tag${COLOR_NONE}"
 		print_yellow "Latest base tag for this branch: ${COLOR_CYAN}$latest_base_tag${COLOR_NONE}"
 		if [ ! -z "$last_temp_tag" ]; then
-			print_yellow "Last temporary tag for this branch: ${COLOR_CYAN}$last_temp_tag${COLOR_NONE}"
+			print_yellow "Latest temporary tag for this branch: ${COLOR_CYAN}$last_temp_tag${COLOR_NONE}"
 		fi
 
 		echo ""
@@ -366,6 +366,22 @@ create_and_push_tag() {
     print_success "Tag created locally"
 
     if git remote | grep -q origin; then
+        # Check if current branch exists on remote
+        local current_branch=$(get_current_branch)
+        local branch_exists_on_remote=$(git ls-remote --heads origin "$current_branch" | wc -l | tr -d ' ')
+
+        # Push branch to remote if it doesn't exist there yet
+        if [ "$branch_exists_on_remote" -eq "0" ]; then
+            print_info "Branch $current_branch does not exist on remote, pushing it first..."
+            if git push -u origin "$current_branch" >/dev/null 2>&1; then
+                print_success "Branch $current_branch pushed to the remote repository"
+            else
+                print_warning "Failed to push branch $current_branch to the remote repository"
+                return 1
+            fi
+        fi
+
+        # Push the tag
         if git push origin "$tag" >/dev/null 2>&1; then
             print_success "Tag pushed to the remote repository"
         else
@@ -397,37 +413,49 @@ cleanup_temporary_tags() {
         echo "   ... and $((tag_count - 5)) more"
     fi
 
-	echo ""
+    local active_branches=$(git branch | sed 's/^[ *]*//' | tr '\n' '|' | sed 's/|$//')
+
+	  echo ""
     print_yellow "Deleting temporary tags on the local repository..."
 
     local deleted_count=0
     for tag in $tmp_tags; do
+        local branch_name=$(echo "$tag" | grep -o "_[^.]*" | sed 's/^_//')
+        if [[ -n "$branch_name" ]] && [[ "$active_branches" =~ "$branch_name" ]]; then
+            continue
+        fi
+
         git tag -d "$tag" 2>/dev/null || true
         deleted_count=$((deleted_count + 1))
     done
 
     print_success "$deleted_count tags deleted from the local repository"
 
-	echo ""
+	  echo ""
     print_yellow "Deleting temporary tags on the remote repository..."
 
     local remote_tmp_tags=$(git ls-remote --tags origin | grep -v "\^{}" | awk '{print $2}' | sed 's/refs\/tags\///' | grep -E "$TEMPORARY_TAG_CLEANUP_PATTERN" || true)
 
-	if [ -z "$remote_tmp_tags" ]; then
-		print_success "No temporary tags to clean up on the remote repository"
-		return 0
-	fi
+    if [ -z "$remote_tmp_tags" ]; then
+      print_success "No temporary tags to clean up on the remote repository"
+      return 0
+    fi
 
-	local remote_deleted_count=0
-	for tag in $remote_tmp_tags; do
-		if git push --delete origin "$tag" 2>/dev/null; then
-			remote_deleted_count=$((remote_deleted_count + 1))
-		else
-			print_warning "Failed to delete tag $tag"
-		fi
-	done
+    local remote_deleted_count=0
+    for tag in $remote_tmp_tags; do
+        local branch_name=$(echo "$tag" | grep -o "_[^.]*" | sed 's/^_//')
+        if [[ -n "$branch_name" ]] && [[ "$active_branches" =~ "$branch_name" ]]; then
+            continue
+        fi
 
-	print_success "$remote_deleted_count temporary tags deleted from the remote repository"
+        if git push --delete origin "$tag" 2>/dev/null; then
+          remote_deleted_count=$((remote_deleted_count + 1))
+        else
+          print_warning "Failed to delete tag $tag"
+        fi
+    done
+
+    print_success "$remote_deleted_count temporary tags deleted from the remote repository"
 }
 
 analyze_tag_inventory() {
