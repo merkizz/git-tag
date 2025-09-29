@@ -94,6 +94,11 @@ When you run the script on a main branch:
 2. Temporary tags associated with deleted branches are identified
 3. These tags are removed both locally and on the remote repository
 
+If you want to run cleanup without creating a tag:
+```bash
+git-tag --cleanup
+```
+
 ## Workflow examples
 
 ### Creating a new version on the main branch

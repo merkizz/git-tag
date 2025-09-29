@@ -28,7 +28,7 @@ readonly SEMANTIC_VERSION_TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+$'
 readonly TICKET_TAG_PATTERN='^(BACK|FRONT)-[0-9]+\.[0-9]+$'
 readonly PRERELEASE_TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+-[a-z]+$'
 readonly TEMPORARY_TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+_.+\.[0-9]+$'
-readonly TEMPORARY_TAG_CLEANUP_PATTERN='_.*\.|_[A-Z]+-[0-9]+$'
+readonly TEMPORARY_TAG_CLEANUP_PATTERN='v[0-9]+\.[0-9]+\.[0-9]+(_|-).*\.|_[A-Z]+-[0-9]+$'
 
 readonly BRANCH_MASTER="master"
 readonly BRANCH_MAIN="main"
@@ -416,7 +416,7 @@ cleanup_temporary_tags() {
 		echo "   ... and $((tag_count - 5)) more"
 	fi
 
-	local active_branches=$(git branch | sed 's/^[ *]*//' | tr '\n' '|' | sed 's/|$//')
+	local active_branches=$(git branch -r | grep -v "->" | sed 's|^[^/]*/||' | tr '\n' '|' | sed 's/|$//')
 
 	echo ""
 	print_yellow "Deleting temporary tags on the local repository..."
@@ -452,13 +452,14 @@ cleanup_temporary_tags() {
 		fi
 
 		if git push --delete origin "$tag" 2>/dev/null; then
+			echo "Deleted tag '$tag'"
 			remote_deleted_count=$((remote_deleted_count + 1))
 		else
-			print_warning "Failed to delete tag $tag"
+			print_warning "Failed to delete tag '$tag'"
 		fi
 	done
 
-	print_success "$remote_deleted_count temporary tags deleted from the remote repository"
+	print_success "$remote_deleted_count tags deleted from the remote repository"
 }
 
 analyze_tag_inventory() {
@@ -484,14 +485,20 @@ print_header "=========================================="
 
 # Validate arguments and reject any option
 FILTERED_ARGS=()
+CLEANUP_ONLY=false
+
 for arg in "$@"; do
-	if [[ "$arg" =~ ^-- ]]; then
+	if [[ "$arg" == "--cleanup" ]]; then
+		CLEANUP_ONLY=true
+	elif [[ "$arg" =~ ^-- ]]; then
 		print_error "Unknown option: $arg"
-		print_info "This script does not accept any options."
+		print_info "This script accepts the following options:"
+		echo "  --cleanup                      # Run only tag cleanup"
 		print_info "Usages:"
 		echo "  $0                            # Interactive mode"
 		echo "  $0 <tag-name>                 # Create tag from current commit"
 		echo "  $0 <tag-name> <commit-hash>   # Create tag from specific commit"
+		echo "  $0 --cleanup                  # Run only tag cleanup"
 		exit 1
 	else
 		FILTERED_ARGS+=("$arg")
@@ -502,6 +509,17 @@ done
 if ! git rev-parse --git-dir >/dev/null 2>&1; then
 	print_error "This script must be run in a Git repository!"
 	exit 1
+fi
+
+if [ "$CLEANUP_ONLY" = true ]; then
+	if ! is_main_branch; then
+		print_error "Cleanup can only be performed on the main branch"
+		print_tip "Please switch to the main branch first"
+		exit 1
+	fi
+	cleanup_temporary_tags
+	analyze_tag_inventory
+	exit 0
 fi
 
 # Run interactive mode if no tag is provided
