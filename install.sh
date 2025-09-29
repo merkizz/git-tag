@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 # === Variables ===
-COMMAND_NAME="create-tag"            # Command name
-SOURCE_SCRIPT="$(pwd)/create-tag.sh" # Source script (inside your project)
+COMMAND_NAME="git-tag"            # Command name
+SOURCE_SCRIPT="$(pwd)/git-tag.sh" # Source script (inside your project)
 TARGET_DIR="$HOME/bin"
 
 # === Step 0: Detect user shell ===

@@ -1,6 +1,6 @@
 # Git Tag
 
-`create-tag` is an advanced tool for creating and managing Git tags with smart version management features.
+`git-tag` is an advanced tool for creating and managing Git tags with smart version management features.
 
 ## Features
 
@@ -23,14 +23,14 @@
    ```bash
    ./install.sh
    ```
-   The `create-tag` command will be installed and available in your shell.
+   The `git-tag` command will be installed and available in your shell.
 3. If you want to define a different command name, use the `--name` option:
    ```bash
-   ./install.sh --name my-create-tag
+   ./install.sh --name my-git-tag
    ```
 4. To uninstall the command:
    ```bash
-   ./install.sh --u --name my-create-tag
+   ./install.sh --u --name my-git-tag
    ```
 
 ## Usage
@@ -38,7 +38,7 @@
 ### Basic mode
 
 ```bash
-create-tag [TAG_NAME] [COMMIT_HASH]
+git-tag [TAG_NAME] [COMMIT_HASH]
 ```
 
 - `TAG_NAME`: The name of the tag to create (format `vX.Y.Z`)
@@ -49,7 +49,7 @@ create-tag [TAG_NAME] [COMMIT_HASH]
 Run the script without arguments to start interactive mode:
 
 ```bash
-create-tag
+git-tag
 ```
 
 The interactive mode will guide you through tag creation with advanced features:
@@ -60,12 +60,12 @@ The interactive mode will guide you through tag creation with advanced features:
 
 1. Create a tag on the current commit:
    ```bash
-   create-tag v1.2.3
+   git-tag v1.2.3
    ```
 
 2. Create a tag on a specific commit:
    ```bash
-   create-tag v1.2.3 a1b2c3d
+   git-tag v1.2.3 a1b2c3d
    ```
 
 ## Supported tag formats
@@ -100,7 +100,7 @@ When you run the script on a main branch:
 
 ```bash
 git checkout main
-create-tag
+git-tag
 # Select the option to create a version tag (patch, minor, major)
 ```
 
@@ -108,7 +108,7 @@ create-tag
 
 ```bash
 git checkout feature/my-feature
-create-tag
+git-tag
 # The script will automatically suggest a temporary tag based on the latest version
 ```
 

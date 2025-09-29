@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #  Smart tool to create Git tags with built-in automatic cleanup
-# Usage: ./create-tag.sh [tag-name] [commit-hash]
+# Usage: ./git-tag.sh [tag-name] [commit-hash]
 
 set -e
 
