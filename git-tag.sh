@@ -88,6 +88,27 @@ print_step() {
 	print_info "\n$1  $2"
 }
 
+show_help() {
+	print_info "USAGE:"
+	echo "  $0 [OPTIONS]"
+	echo "  $0 patch|minor|major"
+	echo ""
+	print_info "OPTIONS:"
+	echo "  -h, --help       Show this help message"
+	echo "  -c, --cleanup    Run only tag cleanup (main branch only)"
+	echo ""
+	print_info "VERSION TYPES (main branch only):"
+	echo "  patch            Create a patch version (e.g., v1.2.3 → v1.2.4)"
+	echo "  minor            Create a minor version (e.g., v1.2.3 → v1.3.0)"
+	echo "  major            Create a major version (e.g., v1.2.3 → v2.0.0)"
+	echo ""
+	print_info "EXAMPLES:"
+	echo "  $0               # Interactive mode"
+	echo "  $0 patch         # Create patch version directly"
+	echo "  $0 -c            # Run cleanup only"
+	echo ""
+}
+
 get_latest_semantic_tag() {
 	git tag -l | grep -E "$SEMANTIC_VERSION_TAG_PATTERN" | sort -V | tail -1
 }
@@ -460,16 +481,16 @@ FILTERED_ARGS=()
 CLEANUP_ONLY=false
 
 for arg in "$@"; do
-	if [[ "$arg" == "--cleanup" ]]; then
+	if [[ "$arg" == "-h" || "$arg" == "--help" ]]; then
+		echo ""
+		show_help
+		exit 0
+	elif [[ "$arg" == "-c" || "$arg" == "--cleanup" ]]; then
 		CLEANUP_ONLY=true
-	elif [[ "$arg" =~ ^-- ]]; then
+	elif [[ "$arg" =~ ^- ]]; then
 		print_error "Unknown option: $arg"
-		print_info "This script accepts the following options:"
-		echo "  --cleanup                      # Run only tag cleanup"
-		print_info "Usages:"
-		echo "  $0                            # Interactive mode"
-		echo "  $0 patch|minor|major          # Create tag directly (main branch only)"
-		echo "  $0 --cleanup                  # Run only tag cleanup"
+		echo ""
+		show_help
 		exit 1
 	else
 		FILTERED_ARGS+=("$arg")
@@ -486,6 +507,7 @@ if [ "$CLEANUP_ONLY" = true ]; then
 	if ! is_main_branch; then
 		print_error "Cleanup can only be performed on the main branch"
 		print_tip "Please switch to the main branch first"
+		print_tip "Run '$0 --help' for more information"
 		exit 1
 	fi
 	cleanup_temporary_tags
@@ -501,6 +523,7 @@ if [ ${#FILTERED_ARGS[@]} -eq 1 ]; then
 		if ! is_main_branch; then
 			print_error "Direct version creation is only allowed on the main branch"
 			print_tip "Please switch to the main branch or use interactive mode"
+			print_tip "Run '$0 --help' for more information"
 			exit 1
 		fi
 

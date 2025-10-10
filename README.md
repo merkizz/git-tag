@@ -33,6 +33,15 @@
 
 ## Usage
 
+### Show help
+
+```bash
+git-tag -h
+git-tag --help
+```
+
+Display the help message with all available options and examples.
+
 ### Interactive mode
 
 ```bash
@@ -51,6 +60,15 @@ On the main branch, you can create a tag directly without interactive mode:
 git-tag patch   # Create a patch version (e.g., v1.2.3 → v1.2.4)
 git-tag minor   # Create a minor version (e.g., v1.2.3 → v1.3.0)
 git-tag major   # Create a major version (e.g., v1.2.3 → v2.0.0)
+```
+
+### Cleanup mode
+
+Run cleanup without creating a tag:
+
+```bash
+git-tag -c
+git-tag --cleanup
 ```
 
 ## Supported tag formats
@@ -77,11 +95,6 @@ When you run the script on a main branch:
 1. Temporary tags are analyzed
 2. Temporary tags associated with deleted branches are identified
 3. These tags are removed both locally and on the remote repository
-
-If you want to run cleanup without creating a tag:
-```bash
-git-tag --cleanup
-```
 
 ## Workflow examples
 
