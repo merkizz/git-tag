@@ -4,8 +4,8 @@
 
 ## Features
 
-- 🏷️ Create version tags (`vX.Y.Z`) and incremental version suggestions (patch, minor, major)
-- 🪾 Create temporary tags on feature branches (`vX.Y.Z_BRANCH.N`)
+- 🏷️ Create version tags with incremental suggestions (patch, minor, major)
+- 🪾 Create temporary tags on feature branches
 - 🧹 Automatic cleanup of temporary tags
 - 🔄 Synchronize tags between main branches (main/master) and feature branches
 
@@ -33,6 +33,8 @@
 
 ## Usage
 
+### Interactive mode
+
 ```bash
 git-tag
 ```
@@ -40,6 +42,16 @@ git-tag
 The interactive mode will guide you through tag creation with advanced features:
 - On a main branch (main/master): options to create version tags (patch, minor, major)
 - On a feature branch: creation of temporary tags based on the latest version from the main branch
+
+### Direct mode (main branch only)
+
+On the main branch, you can create a tag directly without interactive mode:
+
+```bash
+git-tag patch   # Create a patch version (e.g., v1.2.3 → v1.2.4)
+git-tag minor   # Create a minor version (e.g., v1.2.3 → v1.3.0)
+git-tag major   # Create a major version (e.g., v1.2.3 → v2.0.0)
+```
 
 ## Supported tag formats
 

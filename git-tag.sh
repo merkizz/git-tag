@@ -161,6 +161,37 @@ get_last_temp_tag() {
 	fi
 }
 
+calculate_next_version() {
+	local latest_tag="$1"
+	local version_type="$2"
+
+	if [ -z "$latest_tag" ]; then
+		if [ "$version_type" = "minor" ]; then
+			echo "$DEFAULT_MINOR_VERSION"
+		else
+			echo "$DEFAULT_MAJOR_VERSION"
+		fi
+		return
+	fi
+
+	local version_digits=$(echo "$latest_tag" | sed 's/^v//' | tr '.' ' ')
+	local patch=$(echo $version_digits | awk '{print $3}')
+	local minor=$(echo $version_digits | awk '{print $2}')
+	local major=$(echo $version_digits | awk '{print $1}')
+
+	case "$version_type" in
+	patch)
+		echo "v$major.$minor.$((patch + 1))"
+		;;
+	minor)
+		echo "v$major.$((minor + 1)).0"
+		;;
+	major)
+		echo "v$((major + 1)).0.0"
+		;;
+	esac
+}
+
 run_interactive_mode() {
 	echo ""
 
@@ -198,13 +229,9 @@ run_interactive_mode() {
 			esac
 		else
 			# Calculate next versions
-			local version_digits=$(echo "$latest_tag" | sed 's/^v//' | tr '.' ' ')
-			local patch=$(echo $version_digits | awk '{print $3}')
-			local minor=$(echo $version_digits | awk '{print $2}')
-			local major=$(echo $version_digits | awk '{print $1}')
-			local next_patch="v$major.$minor.$((patch + 1))"
-			local next_minor="v$major.$((minor + 1)).0"
-			local next_major="v$((major + 1)).0.0"
+			local next_patch=$(calculate_next_version "$latest_tag" "patch")
+			local next_minor=$(calculate_next_version "$latest_tag" "minor")
+			local next_major=$(calculate_next_version "$latest_tag" "major")
 
 			print_yellow "Latest tag: ${COLOR_CYAN}$latest_tag${COLOR_NONE}"
 			print_step "Select an option (1-3) or C to cancel:"
@@ -441,6 +468,7 @@ for arg in "$@"; do
 		echo "  --cleanup                      # Run only tag cleanup"
 		print_info "Usages:"
 		echo "  $0                            # Interactive mode"
+		echo "  $0 patch|minor|major          # Create tag directly (main branch only)"
 		echo "  $0 --cleanup                  # Run only tag cleanup"
 		exit 1
 	else
@@ -465,8 +493,33 @@ if [ "$CLEANUP_ONLY" = true ]; then
 	exit 0
 fi
 
-# Run interactive mode
-run_interactive_mode
+# Check if a version type argument is provided (patch/minor/major)
+if [ ${#FILTERED_ARGS[@]} -eq 1 ]; then
+	VERSION_TYPE="${FILTERED_ARGS[0]}"
+
+	if [[ "$VERSION_TYPE" =~ ^(patch|minor|major)$ ]]; then
+		if ! is_main_branch; then
+			print_error "Direct version creation is only allowed on the main branch"
+			print_tip "Please switch to the main branch or use interactive mode"
+			exit 1
+		fi
+
+		latest_tag=$(get_latest_semantic_tag)
+		TAG_NAME=$(calculate_next_version "$latest_tag" "$VERSION_TYPE")
+
+		echo ""
+		print_yellow "Current branch: ${COLOR_CYAN}$(get_current_branch)${COLOR_NONE}"
+		if [ ! -z "$latest_tag" ]; then
+			print_yellow "Latest tag: ${COLOR_CYAN}$latest_tag${COLOR_NONE}"
+		fi
+		print_success "Selected tag: $TAG_NAME ($VERSION_TYPE)"
+	fi
+fi
+
+# Run interactive mode if no tag is set
+if [ -z "$TAG_NAME" ]; then
+	run_interactive_mode
+fi
 
 # 1. Check that the tag doesn't exist
 if ! check_tag_exists "$TAG_NAME"; then
