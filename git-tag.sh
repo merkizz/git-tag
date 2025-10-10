@@ -19,14 +19,10 @@ readonly DEFAULT_MINOR_VERSION="v0.1.0"
 
 # Tag patterns
 # SEMANTIC_VERSION_TAG_PATTERN: Semantic version vX.Y.Z (ex: v1.0.0)
-# TICKET_TAG_PATTERN: Project ticket (ex: BACK-123.1)
-# PRERELEASE_TAG_PATTERN: Pre-release (ex: v1.2.3-alpha)
 # TEMPORARY_TAG_PATTERN: Temporary tag (ex: v1.2.3_FRONT-123.1)
 # TEMPORARY_TAG_CLEANUP_PATTERN: Pattern to identify temporary tags to cleanup
 
 readonly SEMANTIC_VERSION_TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+$'
-readonly TICKET_TAG_PATTERN='^(BACK|FRONT)-[0-9]+\.[0-9]+$'
-readonly PRERELEASE_TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+-[a-z]+$'
 readonly TEMPORARY_TAG_PATTERN='^v[0-9]+\.[0-9]+\.[0-9]+_.+\.[0-9]+$'
 readonly TEMPORARY_TAG_CLEANUP_PATTERN='v[0-9]+\.[0-9]+\.[0-9]+(_|-).*\.|_[A-Z]+-[0-9]+$'
 
@@ -178,10 +174,9 @@ run_interactive_mode() {
 	if is_main_branch; then
 		if [ -z "$latest_tag" ]; then
 			print_yellow "No tag found"
-			print_step "Select an option (1-3) or C to cancel:"
+			print_step "Select an option (1-2) or C to cancel:"
 			print_option "1" "Development" "$DEFAULT_MINOR_VERSION"
 			print_option "2" "Release" "$DEFAULT_MAJOR_VERSION"
-			print_option "3" "Enter tag manually"
 			read -p ": " choice
 			case $choice in
 			1)
@@ -191,15 +186,6 @@ run_interactive_mode() {
 			2)
 				selected_tag="$DEFAULT_MAJOR_VERSION"
 				print_success "Selected tag: $selected_tag (release)"
-				;;
-			3)
-				print_blue "Enter tag:"
-				read -r custom_tag
-				if [ -z "$custom_tag" ]; then
-					print_error "Empty tag, tag creation cancelled"
-					exit 1
-				fi
-				selected_tag="$custom_tag"
 				;;
 			C)
 				print_yellow "🚫  Tag creation cancelled."
@@ -221,11 +207,10 @@ run_interactive_mode() {
 			local next_major="v$((major + 1)).0.0"
 
 			print_yellow "Latest tag: ${COLOR_CYAN}$latest_tag${COLOR_NONE}"
-			print_step "Select an option (1-4) or C to cancel:"
+			print_step "Select an option (1-3) or C to cancel:"
 			print_option "1" "Patch - Bug fixes" "$next_patch"
 			print_option "2" "Minor - New features" "$next_minor"
 			print_option "3" "Major - Breaking changes" "$next_major"
-			print_option "4" "Enter tag manually"
 			read -p ": " choice
 			case $choice in
 			1)
@@ -239,16 +224,6 @@ run_interactive_mode() {
 			3)
 				selected_tag="$next_major"
 				print_success "Selected tag: $selected_tag (major)"
-				;;
-			4)
-				print_blue "Enter tag:"
-				read -r custom_tag
-				if [ -z "$custom_tag" ]; then
-					print_error "Empty tag, operation cancelled"
-					exit 1
-				fi
-				selected_tag="$custom_tag"
-				print_success "Selected tag: $selected_tag"
 				;;
 			C)
 				print_yellow "🚫  Tag creation cancelled."
@@ -306,36 +281,6 @@ run_interactive_mode() {
 	fi
 
 	TAG_NAME="$selected_tag"
-}
-
-validate_tag_pattern() {
-	local tag="$1"
-	local pattern="$2"
-	[[ "$tag" =~ $pattern ]]
-}
-
-validate_tag() {
-	local tag="$1"
-
-	print_step "👮🏻‍♂️" "Validating tag $tag..."
-
-	if validate_tag_pattern "$tag" "$SEMANTIC_VERSION_TAG_PATTERN"; then
-		print_success "Valid semantic version tag: $tag"
-		return 0
-	elif validate_tag_pattern "$tag" "$TICKET_TAG_PATTERN"; then
-		print_success "Valid ticket tag: $tag"
-		return 0
-	elif validate_tag_pattern "$tag" "$PRERELEASE_TAG_PATTERN"; then
-		print_success "Valid pre-release tag: $tag"
-		return 0
-	fi
-
-	print_error "Invalid tag format: $tag"
-	print_tip "Accepted formats:"
-	echo "   - Semantic version tag: v1.2.3"
-	echo "   - Ticket tag: BACK-123.1, FRONT-456.2"
-	echo "   - Pre-release tag: v1.2.3-alpha, v1.2.3-beta"
-	return 1
 }
 
 check_tag_exists() {
@@ -496,8 +441,6 @@ for arg in "$@"; do
 		echo "  --cleanup                      # Run only tag cleanup"
 		print_info "Usages:"
 		echo "  $0                            # Interactive mode"
-		echo "  $0 <tag-name>                 # Create tag from current commit"
-		echo "  $0 <tag-name> <commit-hash>   # Create tag from specific commit"
 		echo "  $0 --cleanup                  # Run only tag cleanup"
 		exit 1
 	else
@@ -522,53 +465,26 @@ if [ "$CLEANUP_ONLY" = true ]; then
 	exit 0
 fi
 
-# Run interactive mode if no tag is provided
-if [ ${#FILTERED_ARGS[@]} -lt 1 ]; then
-	run_interactive_mode
-fi
+# Run interactive mode
+run_interactive_mode
 
-if [ -z "$TAG_NAME" ]; then
-	TAG_NAME="${FILTERED_ARGS[0]}"
-
-	# If we're on a feature branch and a tag is provided via command line
-	if [ ! -z "$TAG_NAME" ] && ! is_main_branch; then
-		print_step "🔍" "Validating tag $TAG_NAME..."
-
-		if ! [[ "$TAG_NAME" =~ $TEMPORARY_TAG_PATTERN ]]; then
-			print_error "Invalid tag format: $TAG_NAME"
-			print_tip "Accepted format:"
-			echo "   - Temporary tag: v1.2.3_BRANCH_NAME.1"
-			print_tip "Only temporary tags are allowed on feature branches"
-			print_tip "It's recommended to use the interactive mode to create a temporary tag"
-			exit 1
-		fi
-	fi
-fi
-
-# 1. Validate the tag
-if is_main_branch; then
-	if ! validate_tag "$TAG_NAME"; then
-		exit 1
-	fi
-fi
-
-# 2. Check that the tag doesn't exist
+# 1. Check that the tag doesn't exist
 if ! check_tag_exists "$TAG_NAME"; then
 	exit 1
 fi
 
-# 3. Create and push the tag
-COMMIT_HASH="${FILTERED_ARGS[1]:-$DEFAULT_COMMIT}"
+# 2. Create and push the tag
+COMMIT_HASH="$DEFAULT_COMMIT"
 if ! create_and_push_tag "$TAG_NAME" "$COMMIT_HASH"; then
 	exit 1
 fi
 
-# 4. Clean temporary tags (only on the main branch)
+# 3. Clean temporary tags (only on the main branch)
 if is_main_branch; then
 	cleanup_temporary_tags
 fi
 
-# 5. Display tag inventory (only on the main branch)
+# 4. Display tag inventory (only on the main branch)
 if is_main_branch; then
 	analyze_tag_inventory
 fi

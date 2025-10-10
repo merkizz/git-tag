@@ -1,14 +1,12 @@
 # Git Tag
 
-`git-tag` is an advanced tool for creating and managing Git tags with smart version management features.
+`git-tag` is an advanced tool for creating and managing Git tags with version management features.
 
 ## Features
 
-- 🏷️ Create version tags (`vX.Y.Z`)
-- 💡 Incremental version suggestions (patch, minor, major)
+- 🏷️ Create version tags (`vX.Y.Z`) and incremental version suggestions (patch, minor, major)
 - 🪾 Create temporary tags on feature branches (`vX.Y.Z_BRANCH.N`)
 - 🧹 Automatic cleanup of temporary tags
-- 🔍 Tag format validation
 - 🔄 Synchronize tags between main branches (main/master) and feature branches
 
 ## Requirements
@@ -35,19 +33,6 @@
 
 ## Usage
 
-### Basic mode
-
-```bash
-git-tag [TAG_NAME] [COMMIT_HASH]
-```
-
-- `TAG_NAME`: The name of the tag to create (format `vX.Y.Z`)
-- `COMMIT_HASH` (optional): The commit hash to tag (default: `HEAD`)
-
-### Interactive mode
-
-Run the script without arguments to start interactive mode:
-
 ```bash
 git-tag
 ```
@@ -56,26 +41,12 @@ The interactive mode will guide you through tag creation with advanced features:
 - On a main branch (main/master): options to create version tags (patch, minor, major)
 - On a feature branch: creation of temporary tags based on the latest version from the main branch
 
-### Examples
-
-1. Create a tag on the current commit:
-   ```bash
-   git-tag v1.2.3
-   ```
-
-2. Create a tag on a specific commit:
-   ```bash
-   git-tag v1.2.3 a1b2c3d
-   ```
-
 ## Supported tag formats
 
 - **Semantic version tags**: `vX.Y.Z` (e.g., v1.0.0)
   - `X`: Major version (backward-incompatible changes)
   - `Y`: Minor version (new features)
   - `Z`: Patch version (bug fixes)
-- **Ticket tags**: `TICKET.X` (e.g., FEATURE-123.1)
-- **Pre-release tags**: `vX.Y.Z-alpha` (e.g. v1.0.0-alpha)
 - **Temporary tags**: `vX.Y.Z_BRANCH.N` (e.g., v1.0.0_FEATURE-123.1)
 
 ## How it works
@@ -83,8 +54,9 @@ The interactive mode will guide you through tag creation with advanced features:
 ### Tag creation process
 
 The script uses Git commands to:
-- Create the tag locally and push it to the remote
 - Fetch the latest tags to suggest the next ones
+- Check that the selected tag doesn't exist
+- Create the tag locally and push it to the remote
 - Determine the appropriate base tag for temporary tags on feature branches
 
 ### Automatic cleanup system
