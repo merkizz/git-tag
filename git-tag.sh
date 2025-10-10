@@ -358,7 +358,19 @@ create_and_push_tag() {
 		return 1
 	fi
 
-	git tag "$tag" "$commit" -m "Build tag $tag"
+	# Update package.json if on main branch
+	if [ "$(git rev-parse --abbrev-ref HEAD)" = "main" ] && [ -f "package.json" ]; then
+		local VERSION="${tag#v}"
+		print_yellow "Updating package.json version to $VERSION..."
+		npm version --no-git-tag-version --allow-same-version "$VERSION"
+		if [ -f "package-lock.json" ]; then
+			npm install --package-lock-only
+		fi
+		git add package*.json
+		git commit -m "build: Bump version to $VERSION"
+	fi
+
+	git tag "$tag" "$commit" -m "Tag $tag"
 	print_success "Tag created locally"
 
 	if git remote | grep -q origin; then

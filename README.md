@@ -8,6 +8,7 @@
 - 🪾 Create temporary tags on feature branches
 - 🧹 Automatic cleanup of temporary tags
 - 🔄 Synchronize tags between main branches (main/master) and feature branches
+- 📦 Automatic update of `package.json` and `package-lock.json` (for Node.js projects) when creating a tag on the main branch
 
 ## Requirements
 
@@ -88,6 +89,7 @@ The script uses Git commands to:
 - Check that the selected tag doesn't exist
 - Create the tag locally and push it to the remote
 - Determine the appropriate base tag for temporary tags on feature branches
+- Automatically update `package.json` and `package-lock.json` (for Node.js projects) with the new version number and create a commit before creating the tag (main branch only)
 
 ### Automatic cleanup system
 
