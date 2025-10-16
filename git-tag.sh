@@ -421,7 +421,10 @@ cleanup_temporary_tags() {
 		echo "   ... and $((tag_count - 5)) more"
 	fi
 
-	local active_branches=$(git branch -r | grep -v "->" | sed 's|^[^/]*/||' | tr '\n' '|' | sed 's/|$//')
+	local active_branches=$(git for-each-ref --format='%(refname:short)' refs/remotes/ \
+		  | awk -F/ '$NF != "HEAD" {for(i=2;i<=NF;i++) printf "%s%s", $i, (i<NF?"/":"\n")}' \
+		  | sort -u \
+		  | paste -sd'|' -)
 
 	echo ""
 	print_yellow "Deleting temporary tags on the local repository..."
