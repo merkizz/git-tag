@@ -359,7 +359,7 @@ create_and_push_tag() {
 	fi
 
 	# Update package.json if on main branch
-	if [ "$(git rev-parse --abbrev-ref HEAD)" = "main" ] && [ -f "package.json" ]; then
+	if is_main_branch && [ -f "package.json" ]; then
 		local VERSION="${tag#v}"
 		print_yellow "Updating package.json version to $VERSION..."
 		npm version --no-git-tag-version --allow-same-version "$VERSION"
@@ -368,6 +368,13 @@ create_and_push_tag() {
 		fi
 		git add package*.json
 		git commit -m "build: Bump version to $VERSION"
+		
+		if git remote | grep -q origin; then
+			if ! git push origin "$(get_current_branch)" >/dev/null 2>&1; then
+				print_warning "Failed to push commit to the remote repository"
+				return 1
+			fi
+		fi
 	fi
 
 	git tag "$tag" "$commit" -m "Tag $tag"
